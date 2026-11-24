@@ -9,22 +9,29 @@ export function CardHeader({
   title,
   description,
   action,
+  children,
   className,
 }: {
-  title: ReactNode
+  title?: ReactNode
   description?: ReactNode
   action?: ReactNode
+  children?: ReactNode
   className?: string
 }) {
   return (
     <div className={cn('flex items-start justify-between gap-3 px-5 pt-4 pb-3', className)}>
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+        {title && <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>}
         {description && <p className="mt-0.5 text-[13px] text-muted">{description}</p>}
+        {children}
       </div>
       {action}
     </div>
   )
+}
+
+export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('px-5 pb-4', className)} {...props} />
 }
 
 export function Skeleton({ className }: { className?: string }) {

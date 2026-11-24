@@ -81,3 +81,6 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
   },
 )
 MoneyInput.displayName = 'MoneyInput'
+
+// Alias para compatibilidade
+export const CurrencyInput = MoneyInput

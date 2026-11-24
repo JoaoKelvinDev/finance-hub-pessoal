@@ -32,12 +32,14 @@ def _sum(db: Session, *conds) -> int:
 
 
 def _realized(db: Session, kinds: tuple[str, ...], start: date, end: date) -> int:
+    """Lançamentos efetivados no período, excluindo pagamentos de fatura (evita dupla contagem)."""
     return abs(
         _sum(
             db,
             Transaction.status == "POSTED",
             Transaction.kind.in_(kinds),
             Transaction.effective_date.between(start, end),
+            Transaction.source_type != "statement_payment",
         )
     )
 
@@ -65,7 +67,11 @@ def build_dashboard(db: Session, period_from: date, period_to: date) -> Dashboar
     prev_expense = _realized(db, EXPENSE_KINDS, prev_from, prev_to)
 
     horizon = today + timedelta(days=HORIZON_DAYS)
-    planned_active = and_(Transaction.status == "PLANNED", Transaction.account_id.in_(active_ids))
+    planned_active = and_(
+        Transaction.status == "PLANNED",
+        Transaction.account_id.in_(active_ids),
+        Transaction.source_type != "statement_payment",
+    )
     due_soon = abs(_sum(db, planned_active, Transaction.kind == "EXPENSE", Transaction.effective_date.between(today, horizon)))
     overdue = abs(_sum(db, planned_active, Transaction.kind == "EXPENSE", Transaction.effective_date < today))
     overdue_count = db.scalar(
@@ -191,8 +197,11 @@ def _balance_series(db, active, active_ids, period_from, period_to, today) -> li
         return []
     start_balance = sum(a.opening_balance_cents for a in active if a.opening_date < period_from)
     start_balance += _sum(
-        db, Transaction.status == "POSTED", Transaction.account_id.in_(active_ids),
+        db,
+        Transaction.status == "POSTED",
+        Transaction.account_id.in_(active_ids),
         Transaction.effective_date < period_from,
+        Transaction.source_type != "statement_payment",
     )
     deltas: dict[date, int] = {}
     for a in active:
@@ -201,8 +210,10 @@ def _balance_series(db, active, active_ids, period_from, period_to, today) -> li
     for d, total in db.execute(
         select(Transaction.effective_date, func.sum(Transaction.amount_cents))
         .where(
-            Transaction.status == "POSTED", Transaction.account_id.in_(active_ids),
+            Transaction.status == "POSTED",
+            Transaction.account_id.in_(active_ids),
             Transaction.effective_date.between(period_from, period_to),
+            Transaction.source_type != "statement_payment",
         )
         .group_by(Transaction.effective_date)
     ):
@@ -214,7 +225,9 @@ def _balance_series(db, active, active_ids, period_from, period_to, today) -> li
         for d, total in db.execute(
             select(Transaction.effective_date, func.sum(Transaction.amount_cents))
             .where(
-                Transaction.status == "PLANNED", Transaction.account_id.in_(active_ids),
+                Transaction.status == "PLANNED",
+                Transaction.account_id.in_(active_ids),
+                Transaction.source_type != "statement_payment",
                 Transaction.effective_date <= period_to,
             )
             .group_by(Transaction.effective_date)

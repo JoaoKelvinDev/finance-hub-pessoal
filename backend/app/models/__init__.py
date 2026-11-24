@@ -2,10 +2,15 @@ from app.models.base import Base
 from app.models.entities import (
     AppSettings,
     AuditEvent,
+    CardInstallment,
+    CardPurchase,
+    CardStatement,
     Category,
+    CreditCard,
     FinancialAccount,
     IdempotencyRecord,
     Person,
+    StatementPayment,
     Transaction,
 )
 
@@ -13,9 +18,14 @@ __all__ = [
     "AppSettings",
     "AuditEvent",
     "Base",
+    "CardInstallment",
+    "CardPurchase",
+    "CardStatement",
     "Category",
+    "CreditCard",
     "FinancialAccount",
     "IdempotencyRecord",
     "Person",
+    "StatementPayment",
     "Transaction",
 ]

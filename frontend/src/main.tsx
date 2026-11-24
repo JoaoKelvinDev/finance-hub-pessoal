@@ -10,6 +10,9 @@ import { AppLayout } from '@/app/layout'
 import { ThemeProvider, useTheme } from '@/app/theme'
 import { ApiError } from '@/lib/api'
 import { AccountDetailPage, AccountsPage } from '@/pages/accounts'
+import { BillsPage } from '@/pages/bills'
+import { CardsPage } from '@/pages/cards'
+import { CardDetailPage } from '@/pages/card-detail'
 import { ComingSoonPage } from '@/pages/coming-soon'
 import { DashboardPage } from '@/pages/dashboard'
 import { LoginPage } from '@/pages/login'
@@ -49,6 +52,9 @@ const router = createBrowserRouter([
       { path: '/lancamentos', element: <TransactionsPage /> },
       { path: '/contas', element: <AccountsPage /> },
       { path: '/contas/:id', element: <AccountDetailPage /> },
+      { path: '/cartoes', element: <CardsPage /> },
+      { path: '/cartoes/:id', element: <CardDetailPage /> },
+      { path: '/contas-da-casa', element: <BillsPage /> },
       { path: '/pessoas', element: <PeoplePage /> },
       { path: '/configuracoes', element: <SettingsPage /> },
       { path: '/em-breve/:mod', element: <ComingSoonPage /> },

@@ -4,7 +4,6 @@ import {
   CalendarDays,
   ChartPie,
   CreditCard,
-  Home,
   LayoutDashboard,
   LogOut,
   Monitor,
@@ -12,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Receipt,
   Settings,
   Sun,
   Target,
@@ -42,14 +42,14 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { to: '/', label: 'Visão geral', icon: LayoutDashboard },
       { to: '/lancamentos', label: 'Lançamentos', icon: ArrowLeftRight },
       { to: '/contas', label: 'Contas e carteiras', icon: Wallet },
+      { to: '/cartoes', label: 'Cartões', icon: CreditCard },
+      { to: '/contas-da-casa', label: 'Contas da casa', icon: Receipt },
       { to: '/pessoas', label: 'Pessoas', icon: Users },
     ],
   },
   {
     section: 'Próximas etapas',
     items: [
-      { to: '/em-breve/cartoes', label: 'Cartões', icon: CreditCard, stage: 2 },
-      { to: '/em-breve/contas-da-casa', label: 'Contas da casa', icon: Home, stage: 3 },
       { to: '/em-breve/calendario', label: 'Calendário', icon: CalendarDays, stage: 3 },
       { to: '/em-breve/terceiros', label: 'Valores com terceiros', icon: Users, stage: 4 },
       { to: '/em-breve/planejamento', label: 'Planejamento', icon: Target, stage: 5 },
@@ -62,6 +62,8 @@ const TITLES: Record<string, string> = {
   '/': 'Visão geral',
   '/lancamentos': 'Lançamentos',
   '/contas': 'Contas e carteiras',
+  '/cartoes': 'Cartões',
+  '/contas-da-casa': 'Contas da casa',
   '/pessoas': 'Pessoas',
   '/configuracoes': 'Configurações',
 }
@@ -244,6 +246,8 @@ function MobileNav({ onNew }: { onNew: () => void }) {
     { to: '/', label: 'Início', icon: LayoutDashboard },
     { to: '/lancamentos', label: 'Lançamentos', icon: ArrowLeftRight },
     { to: '/contas', label: 'Contas', icon: Wallet },
+    { to: '/cartoes', label: 'Cartões', icon: CreditCard },
+    { to: '/contas-da-casa', label: 'Contas da casa', icon: Receipt },
     { to: '/configuracoes', label: 'Ajustes', icon: Settings },
   ]
   const left = items.slice(0, 2)

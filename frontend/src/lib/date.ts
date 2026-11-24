@@ -59,6 +59,19 @@ export function daysBetween(a: string, b: string) {
   return Math.round((Date.UTC(pb.y, pb.m - 1, pb.d) - Date.UTC(pa.y, pa.m - 1, pa.d)) / 86_400_000)
 }
 
+export function formatRelativeDate(iso: string): string {
+  const { y, m, d } = parts(iso)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+export function formatDateForInput(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export type PeriodPreset = 'this-month' | 'last-month' | 'last-3' | 'last-6' | 'last-12' | 'custom' | 'all'
 
 export const PRESET_LABELS: Record<Exclude<PeriodPreset, 'custom' | 'all'>, string> = {

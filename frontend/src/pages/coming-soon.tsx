@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/card'
 
 const MODULES: Record<string, { title: string; stage: number; text: string }> = {
   cartoes: { title: 'Cartões e faturas', stage: 2, text: 'Ciclos de fatura, compras parceladas, limite e pagamento de fatura sem dupla contagem.' },
-  'contas-da-casa': { title: 'Contas da casa', stage: 3, text: 'Mensalidades, recorrências, contas variáveis estimadas e rateios.' },
   calendario: { title: 'Calendário financeiro', stage: 3, text: 'Vencimentos de faturas, contas e recebimentos em visão mensal e semanal.' },
   terceiros: { title: 'Valores com terceiros', stage: 4, text: 'Empréstimos, adiantamentos, reembolsos e acertos parciais por pessoa.' },
   planejamento: { title: 'Planejamento', stage: 5, text: 'Orçamentos por categoria, metas e projeção de 30/60/90 dias.' },

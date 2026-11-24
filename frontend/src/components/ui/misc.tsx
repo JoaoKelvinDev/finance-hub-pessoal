@@ -4,6 +4,25 @@ import type { ReactNode } from 'react'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 
+export function Badge({ children, variant = 'default', className }: { children: ReactNode; variant?: 'default' | 'outline' | 'destructive'; className?: string }) {
+  const variants = {
+    default: 'bg-accent/10 text-accent border-accent/20',
+    outline: 'border-border bg-transparent',
+    destructive: 'bg-negative/10 text-negative border-negative/20',
+  }
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+        variants[variant],
+        className,
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
 export function Tooltip({ content, children }: { content: ReactNode; children: ReactNode }) {
   return (
     <T.Root delayDuration={200}>
