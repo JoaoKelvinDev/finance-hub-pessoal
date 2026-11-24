@@ -1,0 +1,28 @@
+# Segredos
+.env
+.env.*
+!.env.example
+*.pem
+signing_keys.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Supabase local
+supabase/.temp/
+supabase/.branches/
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

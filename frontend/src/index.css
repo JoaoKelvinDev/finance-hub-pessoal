@@ -1,0 +1,131 @@
+@import 'tailwindcss';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans/700.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Paleta: grafite/off-white + um destaque azul. Verde/vermelho só para sinal financeiro. */
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f1f1ee;
+  --fg: #18181b;
+  --muted: #64646b;
+  --border: #e4e4e0;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --accent-soft: #e8efff;
+  --positive: #15803d;
+  --positive-soft: #e7f6ec;
+  --negative: #b91c1c;
+  --negative-soft: #fdecec;
+  --warning: #a35c06;
+  --warning-soft: #fdf3e2;
+  --ring: #2563eb;
+  --shadow: 0 1px 2px rgb(16 18 22 / 0.04), 0 1px 1px rgb(16 18 22 / 0.03);
+  --shadow-lg: 0 12px 32px -12px rgb(16 18 22 / 0.18), 0 2px 6px rgb(16 18 22 / 0.06);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0b0d10;
+  --surface: #13161b;
+  --surface-2: #1a1e24;
+  --fg: #e8eaed;
+  --muted: #9aa2ad;
+  --border: #252a32;
+  --accent: #6ea8ff;
+  --accent-fg: #0b0d10;
+  --accent-soft: #16233a;
+  --positive: #4ade80;
+  --positive-soft: #12261a;
+  --negative: #f87171;
+  --negative-soft: #2c1616;
+  --warning: #fbbf24;
+  --warning-soft: #2a2110;
+  --ring: #6ea8ff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-negative: var(--negative);
+  --color-negative-soft: var(--negative-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-ring: var(--ring);
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-bg text-fg font-sans text-[15px] leading-normal;
+    /* Troca de tema suave sem animar layout. */
+    transition: background-color 240ms var(--ease-out-soft), color 240ms var(--ease-out-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  button,
+  [role='button'],
+  a {
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.01em;
+}
+
+@utility shimmer {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--border) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
