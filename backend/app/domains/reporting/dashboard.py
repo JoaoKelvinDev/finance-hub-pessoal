@@ -234,14 +234,19 @@ def _balance_series(db, active, active_ids, period_from, period_to, today) -> li
 
 
 def _categories(db, period_from, period_to, prev_from, prev_to) -> list[CategorySlice]:
+    """Agrupa pela categoria principal (subcategoria soma no pai) para manter poucas fatias."""
+    root = func.coalesce(Category.parent_id, Category.id)
+
     def by_cat(start, end) -> dict:
         rows = db.execute(
-            select(Transaction.category_id, func.sum(Transaction.amount_cents))
+            select(root, func.sum(Transaction.amount_cents))
+            .select_from(Transaction)
+            .outerjoin(Category, Category.id == Transaction.category_id)
             .where(
                 Transaction.status == "POSTED", Transaction.kind.in_(EXPENSE_KINDS),
                 Transaction.effective_date.between(start, end),
             )
-            .group_by(Transaction.category_id)
+            .group_by(root)
         ).all()
         return {cid: abs(int(t)) for cid, t in rows}
 
@@ -261,7 +266,7 @@ def _categories(db, period_from, period_to, prev_from, prev_to) -> list[Category
             CategorySlice(
                 category_id=cid,
                 name=cat.name if cat else "Sem categoria",
-                color=cat.color if cat else "#94A3B8",
+                color=cat.color if cat else "#8A8A85",
                 amount_cents=amount,
                 share_pct=round(amount * 100 / total, 1),
                 previous_cents=prev,
@@ -273,7 +278,7 @@ def _categories(db, period_from, period_to, prev_from, prev_to) -> list[Category
         prev = sum(previous.get(cid, 0) for cid, _ in tail)
         slices.append(
             CategorySlice(
-                category_id=None, name="Outros", color="#64748B", amount_cents=amount,
+                category_id=None, name="Demais categorias", color="#8A8A85", amount_cents=amount,
                 share_pct=round(amount * 100 / total, 1), previous_cents=prev, change_pct=pct_change(amount, prev),
             )
         )

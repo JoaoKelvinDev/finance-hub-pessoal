@@ -27,21 +27,22 @@ TABLES = (
     "audit_events",
 )
 
+# Cores = slots 1–7 da paleta categórica validada (dataviz), na ordem fixa; subcategorias herdam a do pai.
 CATEGORIES = {
     "EXPENSE": {
-        "Moradia": ("#6366F1", ["Aluguel", "Condomínio", "Energia", "Água", "Gás", "Internet", "Telefone", "IPTU"]),
-        "Alimentação": ("#F59E0B", ["Mercado", "Feira", "Delivery"]),
-        "Transporte": ("#0EA5E9", ["Combustível", "Manutenção", "Transporte público"]),
-        "Educação": ("#8B5CF6", ["Faculdade", "Cursos", "Material"]),
-        "Saúde": ("#EF4444", ["Consultas", "Medicamentos", "Plano de saúde"]),
-        "Assinaturas": ("#EC4899", ["Streaming", "Software", "Academia"]),
-        "Outros": ("#64748B", ["Lazer", "Pets", "Compras", "Imprevistos"]),
+        "Moradia": ("#2A78D6", ["Aluguel", "Condomínio", "Energia", "Água", "Gás", "Internet", "Telefone", "IPTU"]),
+        "Alimentação": ("#EB6834", ["Mercado", "Feira", "Delivery"]),
+        "Transporte": ("#1BAF7A", ["Combustível", "Manutenção", "Transporte público"]),
+        "Educação": ("#EDA100", ["Faculdade", "Cursos", "Material"]),
+        "Saúde": ("#E87BA4", ["Consultas", "Medicamentos", "Plano de saúde"]),
+        "Assinaturas": ("#008300", ["Streaming", "Software", "Academia"]),
+        "Outros": ("#6250D6", ["Lazer", "Pets", "Compras", "Imprevistos"]),
     },
     "INCOME": {
-        "Salário": ("#10B981", []),
-        "Renda extra": ("#14B8A6", []),
-        "Rendimentos": ("#22C55E", []),
-        "Outras receitas": ("#84CC16", []),
+        "Salário": ("#2A78D6", []),
+        "Renda extra": ("#EB6834", []),
+        "Rendimentos": ("#1BAF7A", []),
+        "Outras receitas": ("#EDA100", []),
     },
 }
 

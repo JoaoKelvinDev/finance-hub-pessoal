@@ -38,6 +38,8 @@ def create_category(data: CategoryCreate, db: DB, rid: RequestId):
         parent = db.get(Category, data.parent_id)
         if parent is None:
             raise NotFound("Categoria pai")
+        if parent.parent_id is not None:
+            raise Conflict("category_depth", "Subcategorias só podem ficar sob uma categoria principal.")
         if parent.kind != data.kind:
             raise Conflict("category_kind_mismatch", "Subcategoria deve ter o mesmo tipo da categoria pai.")
     cat = Category(**data.model_dump())
