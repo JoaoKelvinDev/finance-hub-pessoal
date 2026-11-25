@@ -65,7 +65,8 @@ def client(database):
     with engine.begin() as c:
         c.execute(
             text(
-                "TRUNCATE transactions, idempotency_records, audit_events, financial_accounts, persons, app_settings"
+                "TRUNCATE transactions, idempotency_records, audit_events, financial_accounts, persons, app_settings,"
+                " budgets, goals, alert_dismissals"
                 " RESTART IDENTITY CASCADE"
             )
         )

@@ -9,6 +9,7 @@ from app.api.v1 import (
     catalog,
     dashboard,
     parties,
+    planning,
     splits,
     transactions,
 )
@@ -26,6 +27,7 @@ api_router.include_router(bills.router)
 api_router.include_router(calendar.router)
 api_router.include_router(parties.router)
 api_router.include_router(alerts.router)
+api_router.include_router(planning.router)
 
 
 @api_router.get("/me", tags=["Sessão"])

@@ -153,6 +153,34 @@ def _card_alerts(db: Session, threshold_pct: int) -> list[Alert]:
     return alerts
 
 
+def _budget_alerts(db: Session) -> list[Alert]:
+    """Orçamentos do período atual em 80% (atenção) e 100% (estourado)."""
+    from app.domains.planning.service import active_budgets_today
+
+    alerts = []
+    for b in active_budgets_today(db):
+        if b.status == "OK":
+            continue
+        over = b.status == "OVER"
+        name = b.category_name or "Orçamento geral"
+        pct = b.used_cents * 100 // b.limit_cents
+        alerts.append(
+            Alert(
+                key=f"budget:{b.id}:{'over' if over else 'warning'}",
+                kind="BUDGET",
+                severity="danger" if over else "warning",
+                title=f"{name}: {pct}% do orçamento {'estourado' if over else 'usado'}",
+                message=f"{format_brl(b.used_cents)} de {format_brl(b.limit_cents)} até {b.period_end:%d/%m}",
+                date=b.period_end,
+                amount_cents=b.used_cents,
+                source="BUDGET",
+                source_id=b.id,
+                link="/planejamento",
+            )
+        )
+    return alerts
+
+
 def list_alerts(db: Session) -> AlertList:
     today = today_local()
     settings = db.get(AppSettings, 1)
@@ -162,7 +190,7 @@ def list_alerts(db: Session) -> AlertList:
         db, today - timedelta(days=LOOKBACK_DAYS), today + timedelta(days=LOOKAHEAD_DAYS), today,
         include_forecast=False,
     )
-    alerts = _event_alerts(events, today) + _card_alerts(db, threshold)
+    alerts = _event_alerts(events, today) + _card_alerts(db, threshold) + _budget_alerts(db)
 
     dismissed = set(db.scalars(select(AlertDismissal.key).where(AlertDismissal.key.in_([a.key for a in alerts]))))
     items = sorted(
