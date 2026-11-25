@@ -679,6 +679,9 @@ function EventRow({
             <StatusIcon className="size-3" aria-hidden />
             {status.label}
           </span>
+          {e.estimated && (
+            <span className="rounded-full bg-accent-soft px-1.5 py-px font-medium text-accent">Estimado</span>
+          )}
           {!compact && <span className="truncate">{showDate ? formatDate(e.date) : source.label}</span>}
         </span>
       </span>

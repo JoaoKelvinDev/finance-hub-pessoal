@@ -127,7 +127,7 @@ function BalanceRow({
               {status.label}
               {daysLate > 0 && ` há ${daysLate} ${daysLate === 1 ? 'dia' : 'dias'}`}
             </span>
-            <span>{ORIGINS[b.origin_type].short}</span>
+            <span>{b.from_split ? 'Rateio de conta da casa' : ORIGINS[b.origin_type].short}</span>
             <span aria-hidden>·</span>
             <span className="num">{formatDate(b.operation_date)}</span>
             {b.due_date && (
@@ -176,7 +176,7 @@ function BalanceRow({
         >
           <ChevronDown className={cn('transition-transform', open && 'rotate-180')} /> Histórico
         </Button>
-        {b.status !== 'CANCELLED' && b.settled_cents === 0 && (
+        {b.status !== 'CANCELLED' && b.settled_cents === 0 && !b.from_split && (
           <Button size="sm" variant="ghost" className="text-negative hover:bg-negative-soft hover:text-negative" onClick={onCancel}>
             <XCircle /> Cancelar
           </Button>

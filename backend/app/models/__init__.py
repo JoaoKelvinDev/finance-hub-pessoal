@@ -2,10 +2,10 @@ from app.models.base import Base
 from app.models.entities import (
     AlertDismissal,
     AppSettings,
+    AuditEvent,
     Bill,
     BillInstallment,
     BillRecurrence,
-    AuditEvent,
     CardInstallment,
     CardPurchase,
     CardStatement,

@@ -8,7 +8,7 @@ import { Card, CardHeader, Skeleton } from '@/components/ui/card'
 import { Input, Select } from '@/components/ui/field'
 import { Segmented } from '@/components/ui/misc'
 import { ApiError } from '@/lib/api'
-import { useCategories, useCreateCategory } from '@/lib/queries'
+import { useAppSettings, useCategories, useCreateCategory, useUpdateSettings } from '@/lib/queries'
 import type { Category } from '@/types/api'
 
 export function SettingsPage() {
@@ -35,6 +35,8 @@ export function SettingsPage() {
           ))}
         </div>
       </Card>
+
+      <AlertSettingsCard />
 
       <Card>
         <CardHeader
@@ -124,5 +126,57 @@ function NewCategory({ kind, roots }: { kind: 'EXPENSE' | 'INCOME'; roots: Categ
         <Plus /> Adicionar
       </Button>
     </form>
+  )
+}
+
+function AlertSettingsCard() {
+  const settings = useAppSettings()
+  const update = useUpdateSettings()
+  const [pct, setPct] = useState<string | null>(null)
+  const current = settings.data?.alert_card_utilization_pct
+  const value = pct ?? (current !== undefined ? String(current) : '')
+
+  return (
+    <Card>
+      <CardHeader
+        title="Alertas"
+        description="Os alertas aparecem no sino do cabeçalho. Lembrete não significa pagamento."
+      />
+      <form
+        className="flex flex-wrap items-end gap-3 px-5 pb-5"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          const n = Number(value)
+          if (!Number.isInteger(n) || n < 1 || n > 100) return toast.error('Use um número inteiro de 1 a 100.')
+          try {
+            await update.mutateAsync({ alert_card_utilization_pct: n })
+            setPct(null)
+            toast.success('Preferência de alerta salva.')
+          } catch (err) {
+            toast.error(err instanceof ApiError ? err.message : 'Não foi possível salvar.')
+          }
+        }}
+      >
+        <label className="flex flex-col gap-1.5 text-sm font-medium">
+          Avisar quando o cartão passar de (% do limite)
+          {settings.isPending ? (
+            <Skeleton className="h-10 w-28" />
+          ) : (
+            <Input
+              type="number"
+              min={1}
+              max={100}
+              inputMode="numeric"
+              className="w-28"
+              value={value}
+              onChange={(e) => setPct(e.target.value)}
+            />
+          )}
+        </label>
+        <Button type="submit" variant="secondary" loading={update.isPending} disabled={pct === null}>
+          Salvar
+        </Button>
+      </form>
+    </Card>
   )
 }

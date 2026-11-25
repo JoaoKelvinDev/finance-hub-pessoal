@@ -1,18 +1,11 @@
 """Regras de negócio para contas da casa (bills) e recorrências."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import Literal
 
 from dateutil.relativedelta import relativedelta
 
 from app.domains.support import today_local
-from app.models.entities import (
-    BILL_INSTALLMENT_STATUS,
-    BILL_CATEGORIES,
-    RECURRENCE_FREQUENCY,
-    RECURRENCE_STATUS,
-)
-
 
 RecurrenceFrequency = Literal["MONTHLY", "BIMONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL", "CUSTOM"]
 RecurrenceStatus = Literal["ACTIVE", "PAUSED", "ENDED"]
@@ -144,10 +137,7 @@ def is_recurrence_active(
     if start_date and current_date < start_date:
         return False
 
-    if end_date and current_date > end_date:
-        return False
-
-    return True
+    return not (end_date and current_date > end_date)
 
 
 def get_next_posting_dates(
@@ -212,6 +202,5 @@ def validate_day_of_month_for_frequency(
             raise ValueError(f"day_of_month é obrigatório para frequência {frequency}")
         if not 1 <= day_of_month <= 31:
             raise ValueError("day_of_month deve estar entre 1 e 31")
-    elif frequency == "CUSTOM":
-        if day_of_month is not None and not 1 <= day_of_month <= 31:
-            raise ValueError("day_of_month deve estar entre 1 e 31")
+    elif frequency == "CUSTOM" and day_of_month is not None and not 1 <= day_of_month <= 31:
+        raise ValueError("day_of_month deve estar entre 1 e 31")

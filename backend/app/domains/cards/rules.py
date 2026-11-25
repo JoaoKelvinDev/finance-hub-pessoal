@@ -1,8 +1,7 @@
 """Regras de domínio para cartões: ciclos, competência, parcelamento, limite."""
 
 import calendar
-from datetime import date, datetime
-from decimal import Decimal, ROUND_DOWN
+from datetime import date
 from typing import Literal
 
 from app.core.errors import DomainError
