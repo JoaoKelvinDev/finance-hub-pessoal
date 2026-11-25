@@ -219,7 +219,7 @@ export function BalanceChart({ data, today }: { data: Dashboard['balance_series'
   return (
     <ChartFrame
       title="Evolução do saldo"
-      description={hasProjection ? 'Realizado até hoje; depois, projeção com lançamentos previstos.' : 'Saldo diário das contas ativas.'}
+      description={hasProjection ? 'Realizado até hoje; depois, a projeção base (faturas, contas da casa, previsões e terceiros).' : 'Saldo diário das contas ativas.'}
       legend={
         <div className="flex gap-4">
           <LegendItem color="var(--accent)" label="Realizado" />

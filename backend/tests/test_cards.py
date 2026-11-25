@@ -243,9 +243,9 @@ def test_pay_statement_full(client):
     acc_bal = next(a for a in client.get("/api/v1/accounts").json() if a["id"] == acc["id"])
     assert acc_bal["balance_cents"] == 80000  # 200000 - 120000
 
-    # Dashboard: pagamento de fatura NÃO conta como despesa
+    # Dashboard (regime de caixa): o pagamento da fatura é a despesa do cartão, uma vez só.
     dash = client.get("/api/v1/dashboard").json()
-    assert dash["kpis"]["expense"]["value_cents"] == 0
+    assert dash["kpis"]["expense"]["value_cents"] == 120000
 
 
 def test_pay_statement_partial(client):
@@ -371,26 +371,28 @@ def test_upcoming_installments_sorted(client):
 
 
 # ---------- Dashboard não duplica despesa ----------
-def test_dashboard_expense_excludes_card_payment(client):
-    """Pagamento de fatura não entra em despesas do dashboard (evita dupla contagem)."""
+def test_dashboard_cartao_conta_uma_vez_pelo_pagamento_da_fatura(client):
+    """Regime de caixa: a compra não é despesa; o pagamento da fatura é, uma única vez."""
     acc = _account(client, opening=500000)
     card = _card(client, default_payment_account_id=acc["id"])
-
-    # Compra no cartão
     _purchase(client, card["id"], total=100000)
 
-    # Dashboard: despesa ainda 0 (compra no cartão não é despesa de caixa)
+    # Compra no cartão ainda não saiu do caixa, mas já é compromisso (fatura a vencer).
     dash = client.get("/api/v1/dashboard").json()
     assert dash["kpis"]["expense"]["value_cents"] == 0
+    assert dash["kpis"]["due_soon"]["value_cents"] + dash["kpis"]["overdue"]["value_cents"] in (0, 100000)
 
-    # Paga a fatura
     stmts = client.get(f"/api/v1/cards/{card['id']}/statements").json()
     _pay_statement(client, stmts[0]["id"], acc["id"], 100000)
 
-    # Dashboard: despesa continua 0 (pagamento de fatura não é despesa de consumo)
     dash = client.get("/api/v1/dashboard").json()
-    assert dash["kpis"]["expense"]["value_cents"] == 0
-
-    # Mas fluxo de caixa mostra saída
-    # (o saldo disponível projetado considera o pagamento)
+    # Uma única despesa: o pagamento da fatura (não a compra + o pagamento).
+    assert dash["kpis"]["expense"]["value_cents"] == 100000
     assert dash["kpis"]["available_balance"]["value_cents"] == 400000
+    # Rosca, relatório de fluxo de caixa e KPI contam o mesmo valor.
+    assert sum(c["amount_cents"] for c in dash["expenses_by_category"]) == 100000
+    flow = client.get("/api/v1/reports/cash-flow", params={"from": dash["period_from"], "to": dash["period_to"]}).json()
+    assert flow["expense_cents"] == 100000
+    # A evolução do saldo termina no saldo disponível real.
+    real = [p for p in dash["balance_series"] if not p["projected"]]
+    assert real[-1]["balance_cents"] == 400000

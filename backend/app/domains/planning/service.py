@@ -170,15 +170,22 @@ def _card_cash_by_category(db: Session, start: date, end: date, totals: Totals) 
         if stmt_total <= 0:
             continue
         paid_cents = min(abs(int(paid or 0)), stmt_total)
-        for amount, category_id in db.execute(
+        items = db.execute(
             select(CardInstallment.amount_cents, CardPurchase.category_id)
             .join(CardPurchase, CardPurchase.id == CardInstallment.purchase_id)
             .where(
                 CardInstallment.statement_id == statement_id,
                 CardInstallment.status.notin_(("REVERSED", "CANCELLED")),
             )
-        ).all():
-            _add(totals, category_id, int(amount) * paid_cents // stmt_total)
+            .order_by(CardInstallment.amount_cents.desc(), CardInstallment.id)
+        ).all()
+        shares = [int(amount) * paid_cents // stmt_total for amount, _ in items]
+        # Centavos que o arredondamento deixou de fora vão para as maiores parcelas:
+        # a soma por categoria fica exatamente igual ao valor pago da fatura.
+        for i in range(paid_cents - sum(shares)):
+            shares[i % len(shares)] += 1
+        for (_, category_id), share in zip(items, shares, strict=True):
+            _add(totals, category_id, share)
 
 
 def _card_competence_by_category(db: Session, start: date, end: date, totals: Totals) -> None:
