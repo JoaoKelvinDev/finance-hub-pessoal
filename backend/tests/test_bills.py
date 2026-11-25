@@ -488,6 +488,27 @@ def test_post_installments_from_recurrence(client):
     assert all(i["status"] == "PENDING" for i in data)
 
 
+def test_post_installments_twice_with_long_history(client):
+    """Recorrência com mais de 12 ocorrências: gera todas e uma 2ª geração não quebra nem duplica."""
+    acc = _account(client, opening_date="2024-01-01")
+    b = _bill(client, acc["id"])
+    today = date.today()
+    start = date(today.year - 2, today.month, 1)
+    rec = _recurrence(client, b["id"], day=1, start=start.isoformat(), auto_post=False)
+    url = f"/api/v1/bills/recurrences/{rec['id']}/post-installments"
+
+    first = client.post(url)
+    assert first.status_code == 200, first.text
+    assert len(first.json()) == 25  # 24 meses completos + mês atual (dia 1 <= hoje)
+
+    second = client.post(url)
+    assert second.status_code == 200, second.text
+    assert second.json() == []
+
+    total = client.get("/api/v1/bills/installments", params={"recurrence_id": rec["id"], "limit": 200}).json()["total"]
+    assert total == 25
+
+
 def test_auto_post_global(client):
     """Auto-post global processa todas as recorrências ativas."""
     acc = _account(client)

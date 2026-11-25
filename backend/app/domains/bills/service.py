@@ -8,6 +8,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, selectinload
 
+from app.domains.support import today_local
 from app.domains.bills.rules import (
     calculate_installment_amounts,
     generate_installment_dates,
@@ -273,20 +274,17 @@ def create_installments_from_recurrence(
     Gera parcelas para uma recorrência até uma data limite.
     Usa o default_amount_cents da conta como base, dividindo igualmente se houver múltiplas parcelas no período.
     """
-    if not is_recurrence_active(recurrence.status, date.today(), recurrence.start_date, recurrence.end_date):
+    if not is_recurrence_active(recurrence.status, today_local(), recurrence.start_date, recurrence.end_date):
         return []
 
     if up_to_date is None:
-        up_to_date = date.today()
+        up_to_date = today_local()
 
     # Busca última parcela já criada para esta recorrência
-    last_installment = db.execute(
-        select(BillInstallment)
-        .where(BillInstallment.recurrence_id == recurrence.id)
-        .order_by(BillInstallment.due_date.desc())
-    ).scalar_one_or_none()
-
-    last_due = last_installment.due_date if last_installment else None
+    # Só a data importa; scalar_one_or_none quebrava (MultipleResultsFound) com 2+ parcelas.
+    last_due = db.scalar(
+        select(func.max(BillInstallment.due_date)).where(BillInstallment.recurrence_id == recurrence.id)
+    )
 
     # Gera datas que precisam ser criadas
     due_dates = get_next_posting_dates(
@@ -349,7 +347,7 @@ def auto_post_all_recurrences(
     gerando parcelas até a data especificada.
     """
     if up_to_date is None:
-        up_to_date = date.today()
+        up_to_date = today_local()
 
     recurrences = db.execute(
         select(BillRecurrence).where(
@@ -498,7 +496,7 @@ def reverse_bill_installment_payment(
         kind="ADJUSTMENT",
         amount_cents=abs(original_tx.amount_cents),  # positivo para cancelar despesa
         status="POSTED",
-        effective_date=date.today(),
+        effective_date=today_local(),
         description=f"Estorno: {bill.name if bill else 'Conta'}",
         source_type="bill_payment_reversal",
         source_id=installment.id,
@@ -632,7 +630,7 @@ def get_upcoming_bill_installments(
     limit: int = 20,
 ) -> list[BillInstallment]:
     """Busca parcelas próximas do vencimento (PENDING ou POSTED)."""
-    today = date.today()
+    today = today_local()
     limit_date = today + __import__("datetime").timedelta(days=days_ahead)
 
     stmt = (
@@ -653,7 +651,7 @@ def get_upcoming_bill_installments(
 
 def get_overdue_bill_installments(db: Session, limit: int = 50) -> list[BillInstallment]:
     """Busca parcelas vencidas e não pagas."""
-    today = date.today()
+    today = today_local()
 
     stmt = (
         select(BillInstallment)

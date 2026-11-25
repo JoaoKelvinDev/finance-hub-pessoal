@@ -5,6 +5,7 @@ from typing import Literal
 
 from dateutil.relativedelta import relativedelta
 
+from app.domains.support import today_local
 from app.models.entities import (
     BILL_INSTALLMENT_STATUS,
     BILL_CATEGORIES,
@@ -156,28 +157,29 @@ def get_next_posting_dates(
     day_of_month: int | None,
     end_date: date | None,
     custom_months_interval: int | None = None,
-    max_lookahead: int = 12,
+    max_lookahead: int = 600,
 ) -> list[date]:
     """
     Retorna as datas de vencimento que devem ser postadas (geradas) agora.
 
     - last_posted_due: última data de vencimento já postada (ou None se nunca postou)
     - recurrence_start: data de início da recorrência
-    - max_lookahead: quantos meses à frente verificar (para evitar loops infinitos)
+    - max_lookahead: teto de ocorrências geradas desde o início (proteção contra laço;
+      600 = 50 anos de mensais). As datas são limitadas a hoje, então o teto não corta
+      recorrências longas (antes era 12 e a recorrência parava após a 12ª ocorrência).
 
     Retorna lista de datas que ainda não foram postadas mas cuja data de vencimento
-    já chegou (ou está próxima, conforme política de auto_post).
+    já chegou.
     """
+    today = today_local()
     all_dates = generate_installment_dates(
         start_date=recurrence_start,
         frequency=frequency,
         day_of_month=day_of_month,
-        end_date=end_date,
+        end_date=min(end_date, today) if end_date else today,
         custom_months_interval=custom_months_interval,
         max_count=max_lookahead,
     )
-
-    today = date.today()
 
     if last_posted_due is None:
         # Primeira postagem: pega todas as datas até hoje
