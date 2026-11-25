@@ -8,8 +8,7 @@ from sqlalchemy import func, select
 from app.api.v1.deps import DB, RequestId
 from app.core.errors import NotFound
 from app.domains.cards import service
-from app.domains.support import audit, snapshot
-from app.models import CardInstallment, CardPurchase, CardStatement, CreditCard, StatementPayment, Transaction
+from app.models import CardInstallment, CardPurchase, CardStatement, CreditCard, StatementPayment
 from app.schemas.finance import (
     CardCreate,
     CardOut,

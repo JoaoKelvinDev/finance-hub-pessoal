@@ -45,7 +45,10 @@ export function AlertsBell() {
               <Bell className="size-[18px]" />
               {badge > 0 && (
                 <span
-                  className="absolute -top-1 -right-1 grid min-w-4 place-items-center rounded-full bg-negative px-1 text-[10px] font-semibold text-bg"
+                  className={cn(
+                    'absolute -top-1 -right-1 grid min-w-4 place-items-center rounded-full px-1 text-[10px] font-semibold text-bg',
+                    counts?.danger ? 'bg-negative' : counts?.warning ? 'bg-warning' : 'bg-muted',
+                  )}
                   aria-hidden
                 >
                   {badge > 9 ? '9+' : badge}

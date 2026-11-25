@@ -1,11 +1,9 @@
 """Serviços de domínio para cartões: CRUD, ciclos, compras, parcelas, pagamentos."""
 
 import uuid
-from collections.abc import Iterable
-from datetime import date, datetime, UTC
-from decimal import Decimal
+from datetime import UTC, date, datetime
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import DomainError, NotFound
@@ -22,7 +20,6 @@ from app.models import (
     Transaction,
 )
 from app.schemas.finance import CardCreate, CardUpdate, PurchaseCreate, StatementPaymentCreate
-
 
 CARD_AUDIT_FIELDS = (
     "name", "bank", "nickname", "last_four", "brand", "type", "limit_cents",
@@ -163,7 +160,7 @@ def update_card(db: Session, card_id: uuid.UUID, data: CardUpdate, request_id: s
         rules.validate_due_day(changes["due_day"])
     if "due_month_offset" in changes:
         rules.validate_due_month_offset(changes["due_month_offset"])
-    if "default_payment_account_id" in changes and changes["default_payment_account_id"]:
+    if changes.get("default_payment_account_id"):
         _active_payment_account(db, changes["default_payment_account_id"])
 
     for k, v in changes.items():

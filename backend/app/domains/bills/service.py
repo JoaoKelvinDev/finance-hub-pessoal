@@ -2,33 +2,24 @@
 
 import uuid
 from datetime import UTC, date, datetime
-from typing import Literal
 
-from sqlalchemy import and_, func, or_, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.errors import DomainError
-from app.domains.ledger import rules as ledger_rules
-from app.domains.ledger.service import TX_AUDIT_FIELDS, _active_account, _check_date
-from app.domains.support import audit, run_idempotent, snapshot, today_local
 from app.domains.bills.rules import (
-    calculate_installment_amounts,
-    generate_installment_dates,
     get_next_posting_dates,
     is_recurrence_active,
     validate_day_of_month_for_frequency,
     validate_recurrence_consistency,
 )
+from app.domains.ledger import rules as ledger_rules
+from app.domains.ledger.service import TX_AUDIT_FIELDS, _active_account, _check_date
+from app.domains.support import audit, run_idempotent, snapshot, today_local
 from app.models.entities import (
-    BILL_INSTALLMENT_STATUS,
-    BILL_CATEGORIES,
-    RECURRENCE_FREQUENCY,
-    RECURRENCE_STATUS,
     Bill,
     BillInstallment,
     BillRecurrence,
-    FinancialAccount,
     Transaction,
 )
 from app.schemas.finance import (
@@ -39,7 +30,6 @@ from app.schemas.finance import (
     RecurrenceCreate,
     RecurrenceUpdate,
 )
-
 
 # ---------- Bills (Contas da casa) ----------
 

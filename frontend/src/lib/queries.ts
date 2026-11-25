@@ -491,3 +491,31 @@ export function useDismissAlert() {
     onSuccess: (data) => qc.setQueryData(keys.alerts, data),
   })
 }
+
+// ---------- Configurações ----------
+
+export interface AppSettings {
+  locale: string
+  timezone: string
+  currency: string
+  theme: string
+  alert_card_utilization_pct: number
+}
+
+export function useAppSettings() {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: ({ signal }) => api<AppSettings>('/settings', { signal }),
+  })
+}
+
+export function useUpdateSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Partial<AppSettings>) => api<AppSettings>('/settings', { method: 'PATCH', body }),
+    onSuccess: (data) => {
+      qc.setQueryData(['settings'], data)
+      void qc.invalidateQueries({ queryKey: ['alerts'] })
+    },
+  })
+}

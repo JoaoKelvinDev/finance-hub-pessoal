@@ -9,7 +9,9 @@ import { useBillInstallments, useReverseBillInstallment, useSkipBillInstallment,
 import { Tooltip } from '@/components/ui/misc'
 import { ConfirmAmountDialog, SplitDialog } from '@/features/bills/SplitDialog'
 import { PayInstallmentDialog } from '@/features/bills/PayInstallmentDialog'
+import { readApiError } from '@/features/parties/meta'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import type { BillInstallment } from '@/types/api'
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -62,26 +64,21 @@ export function InstallmentList({
     setPayInstallment(installment)
   }
 
-  const handleReverse = async (id: string) => {
+  /** Executa a ação e sempre dá retorno: sucesso ou o motivo da recusa (ex.: parcela com rateio). */
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
-      await reverseMutation.mutateAsync({ installmentId: id })
+      await fn()
+      toast.success(ok)
       refetch()
-    } catch { }
+    } catch (err) {
+      toast.error(readApiError(err).message)
+    }
   }
 
-  const handleSkip = async (id: string) => {
-    try {
-      await skipMutation.mutateAsync({ installmentId: id })
-      refetch()
-    } catch { }
-  }
-
-  const handleCancel = async (id: string) => {
-    try {
-      await cancelMutation.mutateAsync({ installmentId: id })
-      refetch()
-    } catch { }
-  }
+  const handleReverse = (id: string) =>
+    run(() => reverseMutation.mutateAsync({ installmentId: id }), 'Pagamento estornado.')
+  const handleSkip = (id: string) => run(() => skipMutation.mutateAsync({ installmentId: id }), 'Parcela pulada.')
+  const handleCancel = (id: string) => run(() => cancelMutation.mutateAsync({ installmentId: id }), 'Parcela cancelada.')
 
   if (isLoading && !allItems.length) {
     return (
@@ -143,6 +140,7 @@ export function InstallmentList({
       <ConfirmAmountDialog installment={confirmAmount} onClose={() => setConfirmAmount(null)} />
       <SplitDialog installment={splitInstallment} onClose={() => setSplitInstallment(null)} />
       <PayInstallmentDialog
+        key={payInstallment?.id ?? 'none'}
         open={!!payInstallment}
         onOpenChange={(open) => { if (!open) setPayInstallment(null) }}
         installment={payInstallment}
@@ -286,7 +284,7 @@ function InstallmentCard({
               {installment.is_estimate && (
                 <p className="text-xs text-muted">
                   Valor estimado: <CurrencyDisplay cents={installment.amount_cents} animated={false} className="inline" />.
-                  Informe o valor real da conta para ratear e pagar.
+                  Informe o valor real para ratear; se pagar com outro valor, ele vira o real.
                 </p>
               )}
 

@@ -1,11 +1,8 @@
 """Testes para contas da casa (bills), recorrências e parcelas."""
 
-import uuid
 from datetime import date, timedelta
 
-import pytest
 from fastapi.testclient import TestClient
-
 
 # ---------- Helpers ----------
 
@@ -648,8 +645,6 @@ def test_is_recurrence_active():
 def test_bills_require_auth(client):
     """Todas as rotas de bills exigem autenticação."""
     # O client do conftest já tem auth, testamos com anon_client
-    from tests.conftest import make_token
-    from fastapi.testclient import TestClient
     from app.main import app
 
     with TestClient(app) as anon:
