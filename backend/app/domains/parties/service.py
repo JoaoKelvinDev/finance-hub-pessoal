@@ -20,7 +20,15 @@ from app.domains.ledger import rules as ledger_rules
 from app.domains.ledger.service import TX_AUDIT_FIELDS, _active_account, _check_date
 from app.domains.money import format_brl
 from app.domains.support import audit, run_idempotent, snapshot, today_local
-from app.models import PartyAdjustment, PartyBalance, PartySettlement, Person, Transaction
+from app.models import (
+    ExpenseSplit,
+    ExpenseSplitPart,
+    PartyAdjustment,
+    PartyBalance,
+    PartySettlement,
+    Person,
+    Transaction,
+)
 from app.schemas.parties import (
     CASH_ORIGINS,
     DIRECTION_BY_ORIGIN,
@@ -48,12 +56,13 @@ ORIGIN_LABEL = {
 # ---------- agregados (sem N+1) ----------
 
 class _Agg:
-    __slots__ = ("charges", "discounts", "settled")
+    __slots__ = ("charges", "discounts", "from_split", "settled")
 
     def __init__(self) -> None:
         self.charges = 0
         self.discounts = 0
         self.settled = 0
+        self.from_split = False
 
 
 def aggregates(db: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, _Agg]:
@@ -75,6 +84,12 @@ def aggregates(db: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, _Agg]:
         .group_by(PartySettlement.party_balance_id)
     ):
         out[bid].settled = int(total)
+    for (bid,) in db.execute(
+        select(ExpenseSplitPart.party_balance_id)
+        .join(ExpenseSplit, ExpenseSplit.id == ExpenseSplitPart.split_id)
+        .where(ExpenseSplitPart.party_balance_id.in_(ids), ExpenseSplit.cancelled_at.is_(None))
+    ):
+        out[bid].from_split = True
     return out
 
 
@@ -114,6 +129,7 @@ def to_out(b: PartyBalance, agg: _Agg, today: date) -> PartyBalanceOut:
         account_name=b.account.name if b.account else None,
         origin_transaction_id=b.origin_transaction_id,
         status=derive_status(b, agg, today),
+        from_split=agg.from_split,
         notes=b.notes,
         cancel_reason=b.cancel_reason,
         created_at=b.created_at,
@@ -430,10 +446,23 @@ def adjust(
     return run_idempotent(db, data.idempotency_key, "party_balance.adjust", payload, _create)
 
 
-def cancel_balance(db: Session, balance_id: uuid.UUID, reason: str, request_id: str | None) -> PartyBalance:
+def cancel_balance(
+    db: Session, balance_id: uuid.UUID, reason: str, request_id: str | None, *, from_split: bool = False
+) -> PartyBalance:
     b = get_balance(db, balance_id, lock=True)
     if b.cancelled_at is not None:
         raise DomainError("already_cancelled", "Este registro já está cancelado.", status_code=409)
+    if not from_split and db.scalar(
+        select(func.count())
+        .select_from(ExpenseSplitPart)
+        .join(ExpenseSplit, ExpenseSplit.id == ExpenseSplitPart.split_id)
+        .where(ExpenseSplitPart.party_balance_id == b.id, ExpenseSplit.cancelled_at.is_(None))
+    ):
+        raise DomainError(
+            "managed_by_split",
+            "Este valor vem de um rateio de conta da casa; desfaça o rateio por lá.",
+            status_code=409,
+        )
     active = db.scalar(
         select(func.count()).where(PartySettlement.party_balance_id == b.id, PartySettlement.reversed_at.is_(None))
     )

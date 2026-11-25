@@ -1,14 +1,17 @@
 """Serviços para contas da casa (bills), recorrências e parcelas."""
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, selectinload
 
-from app.domains.support import today_local
+from app.core.errors import DomainError
+from app.domains.ledger import rules as ledger_rules
+from app.domains.ledger.service import TX_AUDIT_FIELDS, _active_account, _check_date
+from app.domains.support import audit, run_idempotent, snapshot, today_local
 from app.domains.bills.rules import (
     calculate_installment_amounts,
     generate_installment_dates,
@@ -52,6 +55,7 @@ def create_bill(
         description=data.description,
         account_id=data.account_id,
         default_amount_cents=data.default_amount_cents,
+        variable_amount=data.variable_amount,
         color=data.color,
     )
     db.add(bill)
@@ -243,25 +247,27 @@ def create_bill_installment(
     request_id: str | None = None,
 ) -> BillInstallment:
     """Cria uma parcela manual (não vinculada a recorrência)."""
-    # Verifica idempotência se chave fornecida
-    if data.idempotency_key:
-        existing = db.execute(
-            select(BillInstallment).where(BillInstallment.notes == data.idempotency_key)
-        ).scalar_one_or_none()
-        if existing:
-            return existing
+    payload = data.model_dump(exclude={"idempotency_key"})
 
-    installment = BillInstallment(
-        bill_id=data.bill_id,
-        recurrence_id=data.recurrence_id,
-        due_date=data.due_date,
-        amount_cents=data.amount_cents,
-        status="PENDING",
-        notes=data.notes,
+    def _create() -> uuid.UUID:
+        installment = BillInstallment(
+            bill_id=data.bill_id,
+            recurrence_id=data.recurrence_id,
+            due_date=data.due_date,
+            amount_cents=data.amount_cents,
+            is_estimate=data.is_estimate,
+            estimated_amount_cents=data.amount_cents if data.is_estimate else None,
+            status="PENDING",
+            notes=data.notes,
+        )
+        db.add(installment)
+        db.flush()
+        return installment.id
+
+    installment_id, _ = run_idempotent(
+        db, data.idempotency_key, "bill_installment.create", payload, _create
     )
-    db.add(installment)
-    db.flush()
-    return installment
+    return db.get(BillInstallment, installment_id)
 
 
 def create_installments_from_recurrence(
@@ -328,6 +334,8 @@ def create_installments_from_recurrence(
             recurrence_id=recurrence.id,
             due_date=due_date,
             amount_cents=bill.default_amount_cents,
+            is_estimate=bill.variable_amount,
+            estimated_amount_cents=bill.default_amount_cents if bill.variable_amount else None,
             status="PENDING",
         )
         db.add(installment)
@@ -384,6 +392,48 @@ def update_bill_installment(
     return installment
 
 
+def _lock_installment(db: Session, installment_id: uuid.UUID) -> BillInstallment:
+    inst = db.scalar(select(BillInstallment).where(BillInstallment.id == installment_id).with_for_update())
+    if not inst:
+        raise ValueError("Parcela não encontrada")
+    return inst
+
+
+def _require_no_split(inst: BillInstallment, action: str) -> None:
+    if inst.split is not None:
+        raise DomainError(
+            "has_split",
+            f"Esta parcela tem rateio ativo; desfaça o rateio antes de {action}.",
+            status_code=409,
+        )
+
+
+INSTALLMENT_AUDIT_FIELDS = (
+    "status", "amount_cents", "is_estimate", "estimated_amount_cents", "transaction_id",
+)
+
+
+def confirm_installment_amount(
+    db: Session, installment_id: uuid.UUID, amount_cents: int, request_id: str | None = None
+) -> BillInstallment:
+    """Substitui a estimativa pelo valor real, preservando o estimado original."""
+    inst = _lock_installment(db, installment_id)
+    if inst.status not in ("PENDING", "POSTED"):
+        raise DomainError(
+            "installment_closed", "Só parcelas pendentes podem ter o valor confirmado.", status_code=409
+        )
+    if not inst.is_estimate:
+        raise DomainError("already_confirmed", "O valor desta parcela já foi confirmado.", status_code=409)
+    before = snapshot(inst, INSTALLMENT_AUDIT_FIELDS)
+    inst.estimated_amount_cents = inst.estimated_amount_cents or inst.amount_cents
+    inst.amount_cents = amount_cents
+    inst.is_estimate = False
+    after = snapshot(inst, INSTALLMENT_AUDIT_FIELDS)
+    audit(db, "bill_installment", inst.id, "confirm_amount", before, after, request_id)
+    db.flush()
+    return inst
+
+
 def pay_bill_installment(
     db: Session,
     installment_id: uuid.UUID,
@@ -394,61 +444,66 @@ def pay_bill_installment(
     request_id: str | None = None,
 ) -> tuple[BillInstallment, Transaction]:
     """
-    Paga uma parcela de conta da casa.
-    Cria uma transação do tipo EXPENSE na conta e marca a parcela como PAID.
+    Paga uma parcela de conta da casa: cria um EXPENSE na conta e marca a parcela como PAID.
+
+    - Estimativa paga com outro valor: o valor pago vira o real (estimado é preservado).
+    - Parcela com valor confirmado só aceita o valor exato.
     """
-    installment = db.get(BillInstallment, installment_id)
-    if not installment:
-        raise ValueError("Parcela não encontrada")
+    payload = {
+        "installment_id": installment_id, "account_id": account_id,
+        "paid_on": paid_on, "amount_cents": amount_cents,
+    }
 
-    # Verifica idempotência PRIMEIRO - antes de checar status
-    if idempotency_key:
-        existing = db.execute(
-            select(BillInstallment).where(BillInstallment.notes == idempotency_key)
-        ).scalar_one_or_none()
-        if existing:
-            tx = db.get(Transaction, existing.transaction_id)
-            return existing, tx
+    def _pay() -> uuid.UUID:
+        installment = _lock_installment(db, installment_id)
+        if installment.status in ("PAID", "REVERSED", "CANCELLED", "SKIPPED"):
+            raise ValueError(f"Parcela não pode ser paga (status: {installment.status})")
 
-    if installment.status in ("PAID", "REVERSED", "CANCELLED"):
-        raise ValueError(f"Parcela não pode ser paga (status: {installment.status})")
+        pay_amount = amount_cents or installment.amount_cents
+        if pay_amount != installment.amount_cents and not installment.is_estimate:
+            raise ValueError("Valor do pagamento deve ser igual ao valor da parcela")
 
-    # Usa valor da parcela se não especificado
-    pay_amount = amount_cents or installment.amount_cents
-    if pay_amount != installment.amount_cents:
-        raise ValueError("Valor do pagamento deve ser igual ao valor da parcela")
+        account = _active_account(db, account_id, lock=True)
+        _check_date(account, paid_on)
+        ledger_rules.validate_status_date("POSTED", paid_on, today_local())
 
-    # Busca conta
-    account = db.get(FinancialAccount, account_id)
-    if not account:
-        raise ValueError("Conta não encontrada")
+        before = snapshot(installment, INSTALLMENT_AUDIT_FIELDS)
+        if installment.is_estimate:
+            if installment.estimated_amount_cents is None:
+                installment.estimated_amount_cents = installment.amount_cents
+            installment.amount_cents = pay_amount
+            installment.is_estimate = False
 
-    # Cria transação de despesa
-    bill = db.get(Bill, installment.bill_id)
-    tx = Transaction(
-        account_id=account_id,
-        kind="EXPENSE",
-        amount_cents=-pay_amount,
-        status="POSTED",
-        effective_date=paid_on,
-        description=f"Pagamento: {bill.name if bill else 'Conta'}",
-        category_id=None,
-        source_type="bill_payment",
-        source_id=installment.id,
-        notes=f"Parcela {installment.due_date.strftime('%m/%Y')}",
-    )
-    db.add(tx)
-    db.flush()
+        bill = db.get(Bill, installment.bill_id)
+        tx = Transaction(
+            account_id=account.id,
+            kind="EXPENSE",
+            amount_cents=-pay_amount,
+            status="POSTED",
+            effective_date=paid_on,
+            description=f"Pagamento: {bill.name if bill else 'Conta'}",
+            category_id=None,
+            source_type="bill_payment",
+            source_id=installment.id,
+            notes=f"Parcela {installment.due_date.strftime('%m/%Y')}",
+        )
+        db.add(tx)
+        db.flush()
+        audit(db, "transaction", tx.id, "create", None, snapshot(tx, TX_AUDIT_FIELDS), request_id)
 
-    # Atualiza parcela
-    installment.status = "PAID"
-    installment.paid_at = datetime.now()
-    installment.transaction_id = tx.id
-    if idempotency_key:
-        installment.notes = idempotency_key
+        installment.status = "PAID"
+        installment.paid_at = datetime.now(UTC)
+        installment.transaction_id = tx.id
+        audit(
+            db, "bill_installment", installment.id, "pay", before,
+            snapshot(installment, INSTALLMENT_AUDIT_FIELDS), request_id,
+        )
+        db.flush()
+        return installment.id
 
-    db.flush()
-    return installment, tx
+    paid_id, _ = run_idempotent(db, idempotency_key, "bill_installment.pay", payload, _pay)
+    installment = db.get(BillInstallment, paid_id)
+    return installment, db.get(Transaction, installment.transaction_id)
 
 
 def reverse_bill_installment_payment(
@@ -467,6 +522,7 @@ def reverse_bill_installment_payment(
 
     if installment.status != "PAID":
         raise ValueError("Só é possível estornar parcelas pagas")
+    _require_no_split(installment, "estornar o pagamento")
 
     if not installment.transaction_id:
         raise ValueError("Parcela não tem transação associada")
@@ -507,7 +563,7 @@ def reverse_bill_installment_payment(
 
     # Atualiza parcela
     installment.status = "REVERSED"
-    installment.reversed_at = datetime.now()
+    installment.reversed_at = datetime.now(UTC)
     installment.transaction_id = reversal_tx.id
 
     db.flush()
@@ -526,10 +582,9 @@ def skip_bill_installment(
 
     if installment.status in ("PAID", "REVERSED", "CANCELLED"):
         raise ValueError(f"Parcela não pode ser pulada (status: {installment.status})")
+    _require_no_split(installment, "pular a parcela")
 
     installment.status = "SKIPPED"
-    if idempotency_key:
-        installment.notes = idempotency_key
     db.flush()
     return installment
 
@@ -546,10 +601,9 @@ def cancel_bill_installment(
 
     if installment.status in ("PAID", "REVERSED"):
         raise ValueError("Não é possível cancelar parcela paga ou estornada")
+    _require_no_split(installment, "cancelar a parcela")
 
     installment.status = "CANCELLED"
-    if idempotency_key:
-        installment.notes = idempotency_key
     db.flush()
     return installment
 

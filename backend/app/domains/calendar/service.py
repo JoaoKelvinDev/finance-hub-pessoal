@@ -131,6 +131,7 @@ def _bill_events(db: Session, date_from: date, date_to: date, today: date) -> li
                 open_cents=open_cents,
                 status=status,
                 color=bill.color,
+                estimated=inst.is_estimate and status not in ("PAID", "SKIPPED", "REVERSED"),
             )
         )
     return events
@@ -188,6 +189,7 @@ def _forecast_events(db: Session, date_from: date, date_to: date) -> list[Calend
                     open_cents=bill.default_amount_cents,
                     status="FORECAST",
                     color=bill.color,
+                    estimated=bill.variable_amount,
                 )
             )
     return events
@@ -255,20 +257,28 @@ def _party_events(db: Session, date_from: date, date_to: date, today: date) -> l
     return events
 
 
+def collect_events(
+    db: Session, date_from: date, date_to: date, today: date, *, include_forecast: bool
+) -> list[CalendarEvent]:
+    """Eventos reais (e, opcionalmente, previsões de recorrência) no intervalo, sem validar tamanho."""
+    events = (
+        _statement_events(db, date_from, date_to, today)
+        + _bill_events(db, date_from, date_to, today)
+        + _planned_events(db, date_from, date_to, today)
+        + _party_events(db, date_from, date_to, today)
+    )
+    if include_forecast:
+        events += _forecast_events(db, date_from, date_to)
+    return events
+
+
 _STATUS_ORDER = {"OVERDUE": 0, "PARTIAL": 1, "PENDING": 2, "FORECAST": 3, "PAID": 4, "SKIPPED": 5, "REVERSED": 6}
 
 
 def build_calendar(db: Session, date_from: date, date_to: date) -> CalendarResponse:
     _validate_range(date_from, date_to)
     today = today_local()
-
-    events = (
-        _statement_events(db, date_from, date_to, today)
-        + _bill_events(db, date_from, date_to, today)
-        + _forecast_events(db, date_from, date_to)
-        + _planned_events(db, date_from, date_to, today)
-        + _party_events(db, date_from, date_to, today)
-    )
+    events = collect_events(db, date_from, date_to, today, include_forecast=True)
     # Defesa extra: nenhuma chave repetida chega ao cliente.
     unique = {e.key: e for e in events}
     events = sorted(unique.values(), key=lambda e: (e.date, _STATUS_ORDER.get(e.status, 9), -e.open_cents, e.title))

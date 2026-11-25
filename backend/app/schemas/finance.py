@@ -216,11 +216,13 @@ class SettingsOut(ORM):
     timezone: str
     currency: str
     theme: str
+    alert_card_utilization_pct: int
 
 
 class SettingsUpdate(BaseModel):
     theme: Literal["light", "dark", "system"] | None = None
     timezone: Annotated[str, StringConstraints(max_length=64)] | None = None
+    alert_card_utilization_pct: int | None = Field(None, ge=1, le=100)
 
 
 # ---------- Cartões ----------
@@ -391,6 +393,7 @@ class BillCreate(BaseModel):
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
     account_id: uuid.UUID
     default_amount_cents: int = Field(..., gt=0, le=MAX_CENTS)
+    variable_amount: bool = False
     color: Color = "#EF4444"
 
 
@@ -399,6 +402,7 @@ class BillUpdate(BaseModel):
     category: BillCategory | None = None
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
     default_amount_cents: int | None = Field(None, gt=0, le=MAX_CENTS)
+    variable_amount: bool | None = None
     color: Color | None = None
     archived: bool | None = None
 
@@ -411,6 +415,7 @@ class BillOut(ORM):
     account_id: uuid.UUID
     account_name: str | None = None
     default_amount_cents: int
+    variable_amount: bool = False
     color: str
     archived_at: datetime | None
     created_at: datetime
@@ -425,6 +430,7 @@ class BillOut(ORM):
             account_id=b.account_id,
             account_name=b.account.name if b.account else None,
             default_amount_cents=b.default_amount_cents,
+            variable_amount=b.variable_amount,
             color=b.color,
             archived_at=b.archived_at,
             created_at=b.created_at,
@@ -468,8 +474,13 @@ class BillInstallmentCreate(BaseModel):
     recurrence_id: uuid.UUID | None = None
     due_date: date
     amount_cents: int = Field(..., gt=0, le=MAX_CENTS)
+    is_estimate: bool = False
     notes: Notes | None = None
     idempotency_key: IdemKey | None = None
+
+
+class ConfirmAmountIn(BaseModel):
+    amount_cents: int = Field(..., gt=0, le=MAX_CENTS)
 
 
 class BillInstallmentUpdate(BaseModel):
@@ -486,6 +497,9 @@ class BillInstallmentOut(ORM):
     recurrence_id: uuid.UUID | None
     due_date: date
     amount_cents: int
+    is_estimate: bool = False
+    estimated_amount_cents: int | None = None
+    split_id: uuid.UUID | None = None
     status: BillInstallmentStatus
     paid_at: datetime | None
     reversed_at: datetime | None
@@ -502,6 +516,9 @@ class BillInstallmentOut(ORM):
             recurrence_id=i.recurrence_id,
             due_date=i.due_date,
             amount_cents=i.amount_cents,
+            is_estimate=i.is_estimate,
+            estimated_amount_cents=i.estimated_amount_cents,
+            split_id=i.split.id if i.split else None,
             status=i.status,
             paid_at=i.paid_at,
             reversed_at=i.reversed_at,

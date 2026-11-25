@@ -25,6 +25,8 @@ class CalendarEvent(BaseModel):
     open_cents: int
     status: CalendarStatus
     color: str
+    # Valor provisório (conta variável ainda sem valor real confirmado).
+    estimated: bool = False
 
 
 class CalendarDay(BaseModel):

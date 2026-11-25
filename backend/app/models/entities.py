@@ -71,6 +71,8 @@ class AppSettings(Base, Timestamps):
     timezone: Mapped[str] = mapped_column(String(64), default="America/Fortaleza")
     currency: Mapped[str] = mapped_column(String(3), default="BRL")
     theme: Mapped[str] = mapped_column(String(10), default="system")
+    # Alerta quando a fatura atual passar deste % do limite do cartão.
+    alert_card_utilization_pct: Mapped[int] = mapped_column(SmallInteger, default=80)
 
 
 class FinancialAccount(Base, UUIDPk, Timestamps):
@@ -325,6 +327,8 @@ class Bill(Base, UUIDPk, Timestamps):
     description: Mapped[str | None] = mapped_column(String(200))
     account_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("financial_accounts.id", ondelete="RESTRICT"))
     default_amount_cents: Mapped[int] = mapped_column(BigInteger)
+    # Conta variável (luz, água): parcelas geradas nascem como estimativa.
+    variable_amount: Mapped[bool] = mapped_column(default=False)
     color: Mapped[str] = mapped_column(String(9), default="#EF4444")
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -373,6 +377,10 @@ class BillInstallment(Base, UUIDPk, Timestamps):
     recurrence_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("bill_recurrences.id", ondelete="SET NULL"))
     due_date: Mapped[date] = mapped_column(Date)
     amount_cents: Mapped[int] = mapped_column(BigInteger)
+    # Estimado × real: enquanto is_estimate, amount_cents é provisório.
+    is_estimate: Mapped[bool] = mapped_column(default=False)
+    # Valor estimado original, preservado quando o real é confirmado.
+    estimated_amount_cents: Mapped[int | None] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(20), default="PENDING")
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -382,6 +390,13 @@ class BillInstallment(Base, UUIDPk, Timestamps):
     bill: Mapped[Bill] = relationship(lazy="select")
     recurrence: Mapped[BillRecurrence | None] = relationship(lazy="select")
     transaction: Mapped[Transaction | None] = relationship(lazy="select")
+    # Rateio ativo (no máximo um por parcela).
+    split: Mapped["ExpenseSplit | None"] = relationship(
+        primaryjoin="and_(ExpenseSplit.bill_installment_id == BillInstallment.id, ExpenseSplit.cancelled_at.is_(None))",
+        viewonly=True,
+        uselist=False,
+        lazy="select",
+    )
 
 
 # ---------- Etapa 4 — Valores com terceiros ----------
@@ -464,3 +479,67 @@ class PartyAdjustment(Base, UUIDPk, Timestamps):
     applied_on: Mapped[date] = mapped_column(Date)
     reason: Mapped[str] = mapped_column(String(200))
     reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ---------- Etapa 3 (fechamento) — rateio e alertas ----------
+
+SPLIT_METHODS = ("EQUAL", "FIXED", "PERCENT")
+
+
+class ExpenseSplit(Base, UUIDPk, Timestamps):
+    """Rateio de uma parcela de conta da casa entre contatos (sem login).
+
+    A despesa original continua bruta; cada parte alheia vira um PartyBalance OWED_TO_ME.
+    """
+
+    __tablename__ = "expense_splits"
+    __table_args__ = (
+        CheckConstraint(_in("method", SPLIT_METHODS), name="method_valid"),
+        CheckConstraint("total_cents > 0", name="total_positive"),
+        CheckConstraint("owner_share_cents >= 0 AND owner_share_cents <= total_cents", name="owner_share_range"),
+        Index(
+            "uq_expense_splits_active_installment", "bill_installment_id", unique=True,
+            postgresql_where=text("cancelled_at IS NULL"),
+        ),
+    )
+
+    bill_installment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bill_installments.id", ondelete="RESTRICT"))
+    method: Mapped[str] = mapped_column(String(10))
+    include_owner: Mapped[bool] = mapped_column(default=True)
+    total_cents: Mapped[int] = mapped_column(BigInteger)
+    owner_share_cents: Mapped[int] = mapped_column(BigInteger)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancel_reason: Mapped[str | None] = mapped_column(String(200))
+
+    parts: Mapped[list["ExpenseSplitPart"]] = relationship(
+        lazy="selectin", order_by="ExpenseSplitPart.created_at", back_populates="split"
+    )
+
+
+class ExpenseSplitPart(Base, UUIDPk, Timestamps):
+    __tablename__ = "expense_split_parts"
+    __table_args__ = (
+        CheckConstraint("share_cents > 0", name="share_positive"),
+        CheckConstraint("percent_bp IS NULL OR (percent_bp > 0 AND percent_bp <= 10000)", name="percent_range"),
+        UniqueConstraint("split_id", "person_id", name="uq_split_part_person"),
+        UniqueConstraint("party_balance_id", name="uq_split_part_balance"),
+    )
+
+    split_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("expense_splits.id", ondelete="RESTRICT"))
+    person_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persons.id", ondelete="RESTRICT"))
+    share_cents: Mapped[int] = mapped_column(BigInteger)
+    # Percentual em pontos-base (100% = 10000), só no método PERCENT.
+    percent_bp: Mapped[int | None] = mapped_column(Integer)
+    party_balance_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("party_balances.id", ondelete="RESTRICT"))
+
+    split: Mapped[ExpenseSplit] = relationship(back_populates="parts")
+    person: Mapped[Person] = relationship(lazy="joined")
+
+
+class AlertDismissal(Base):
+    """Alerta dispensado. A chave inclui o estágio (ex.: D-3), então um agravamento reaparece."""
+
+    __tablename__ = "alert_dismissals"
+
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    dismissed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

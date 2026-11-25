@@ -109,6 +109,8 @@ class PartyBalanceOut(BaseModel):
     account_name: str | None
     origin_transaction_id: uuid.UUID | None
     status: PartyStatus
+    # Gerado por rateio de conta da casa: só é desfeito pelo rateio.
+    from_split: bool = False
     notes: str | None
     cancel_reason: str | None
     created_at: datetime
