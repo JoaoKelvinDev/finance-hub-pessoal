@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChartPie,
   CreditCard,
+  HandCoins,
   LayoutDashboard,
   LogOut,
   Monitor,
@@ -45,13 +46,13 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { to: '/cartoes', label: 'Cartões', icon: CreditCard },
       { to: '/contas-da-casa', label: 'Contas da casa', icon: Receipt },
       { to: '/calendario', label: 'Calendário', icon: CalendarDays },
+      { to: '/terceiros', label: 'Valores com terceiros', icon: HandCoins },
       { to: '/pessoas', label: 'Pessoas', icon: Users },
     ],
   },
   {
     section: 'Próximas etapas',
     items: [
-      { to: '/em-breve/terceiros', label: 'Valores com terceiros', icon: Users, stage: 4 },
       { to: '/em-breve/planejamento', label: 'Planejamento', icon: Target, stage: 5 },
       { to: '/em-breve/relatorios', label: 'Relatórios', icon: ChartPie, stage: 5 },
     ],
@@ -65,6 +66,7 @@ const TITLES: Record<string, string> = {
   '/cartoes': 'Cartões',
   '/contas-da-casa': 'Contas da casa',
   '/calendario': 'Calendário financeiro',
+  '/terceiros': 'Valores com terceiros',
   '/pessoas': 'Pessoas',
   '/configuracoes': 'Configurações',
 }
@@ -105,9 +107,15 @@ export function AppLayout() {
 
   const title =
     TITLES[location.pathname] ??
-    (location.pathname.startsWith('/contas/') ? 'Extrato da conta' : location.pathname.startsWith('/em-breve') ? 'Em breve' : '')
+    (location.pathname.startsWith('/contas/')
+      ? 'Extrato da conta'
+      : location.pathname.startsWith('/pessoas/')
+        ? 'Contato'
+        : location.pathname.startsWith('/em-breve')
+          ? 'Em breve'
+          : '')
   // Chave por seção: navegar entre abas/filtros da mesma página não dispara transição de tela.
-  const pageKey = '/' + (location.pathname.split('/')[1] ?? '') + (location.pathname.startsWith('/contas/') ? '/detalhe' : '')
+  const pageKey = '/' + (location.pathname.split('/')[1] ?? '') + (/^\/(contas|pessoas)\/./.test(location.pathname) ? '/detalhe' : '')
 
   return (
     <QuickAdd.Provider value={openNew}>

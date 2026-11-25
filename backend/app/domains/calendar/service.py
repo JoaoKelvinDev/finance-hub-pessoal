@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from app.core.errors import DomainError
 from app.domains.bills.rules import generate_installment_dates
 from app.domains.cards.rules import derive_statement_status
+from app.domains.parties.service import aggregates as party_aggregates
+from app.domains.parties.service import to_out as party_to_out
 from app.domains.support import today_local
 from app.models.entities import (
     Bill,
@@ -29,6 +31,7 @@ from app.models.entities import (
     CardInstallment,
     CardStatement,
     CreditCard,
+    PartyBalance,
     Transaction,
 )
 from app.schemas.calendar import CalendarDay, CalendarEvent, CalendarResponse, CalendarSummary
@@ -220,6 +223,38 @@ def _planned_events(db: Session, date_from: date, date_to: date, today: date) ->
     return events
 
 
+def _party_events(db: Session, date_from: date, date_to: date, today: date) -> list[CalendarEvent]:
+    rows = db.scalars(
+        select(PartyBalance).where(
+            PartyBalance.cancelled_at.is_(None),
+            PartyBalance.due_date.between(date_from, date_to),
+        )
+    ).unique().all()
+    aggs = party_aggregates(db, [b.id for b in rows])
+    status_map = {"SETTLED": "PAID", "OVERDUE": "OVERDUE", "PARTIALLY_SETTLED": "PARTIAL"}
+    events = []
+    for b in rows:
+        out = party_to_out(b, aggs[b.id], today)
+        receivable = b.direction == "RECEIVABLE"
+        events.append(
+            CalendarEvent(
+                key=f"party_balance:{b.id}",
+                source="PARTY_BALANCE",
+                source_id=b.id,
+                ref_id=b.person_id,
+                date=b.due_date,
+                title=f"{'Receber de' if receivable else 'Pagar a'} {out.person_name}",
+                subtitle=b.description,
+                direction="IN" if receivable else "OUT",
+                amount_cents=out.principal_cents + out.charges_cents - out.discounts_cents,
+                open_cents=out.open_cents,
+                status=status_map.get(out.status, "PENDING"),
+                color="#0EA5E9" if receivable else "#F97316",
+            )
+        )
+    return events
+
+
 _STATUS_ORDER = {"OVERDUE": 0, "PARTIAL": 1, "PENDING": 2, "FORECAST": 3, "PAID": 4, "SKIPPED": 5, "REVERSED": 6}
 
 
@@ -232,6 +267,7 @@ def build_calendar(db: Session, date_from: date, date_to: date) -> CalendarRespo
         + _bill_events(db, date_from, date_to, today)
         + _forecast_events(db, date_from, date_to)
         + _planned_events(db, date_from, date_to, today)
+        + _party_events(db, date_from, date_to, today)
     )
     # Defesa extra: nenhuma chave repetida chega ao cliente.
     unique = {e.key: e for e in events}

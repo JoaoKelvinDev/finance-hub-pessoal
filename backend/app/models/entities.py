@@ -23,7 +23,18 @@ from app.models.base import Base, Timestamps, UUIDPk
 
 ACCOUNT_TYPES = ("CHECKING", "SAVINGS", "CASH", "DIGITAL_WALLET", "OTHER")
 CATEGORY_KINDS = ("INCOME", "EXPENSE")
-TX_KINDS = ("INCOME", "EXPENSE", "TRANSFER_IN", "TRANSFER_OUT", "ADJUSTMENT")
+TX_KINDS = (
+    "INCOME", "EXPENSE", "TRANSFER_IN", "TRANSFER_OUT", "ADJUSTMENT",
+    # Etapa 4 — terceiros: movimentam caixa, mas nunca são receita/despesa.
+    "LOAN_OUT", "LOAN_IN", "SETTLEMENT_IN", "SETTLEMENT_OUT",
+)
+# Sinal obrigatório por kind (ADJUSTMENT é livre).
+TX_POSITIVE_KINDS = ("INCOME", "TRANSFER_IN", "LOAN_IN", "SETTLEMENT_IN")
+TX_NEGATIVE_KINDS = ("EXPENSE", "TRANSFER_OUT", "LOAN_OUT", "SETTLEMENT_OUT")
+
+PARTY_DIRECTIONS = ("RECEIVABLE", "PAYABLE")
+PARTY_ORIGINS = ("LOAN_GIVEN", "LOAN_TAKEN", "ADVANCE", "OWED_TO_ME", "I_OWE")
+PARTY_ADJUSTMENT_KINDS = ("CHARGE", "DISCOUNT")
 TX_STATUSES = ("PLANNED", "POSTED", "CANCELLED")
 
 CARD_TYPES = ("CREDIT", "DEBIT", "PREPAID")
@@ -42,6 +53,13 @@ RECURRENCE_STATUS = ("ACTIVE", "PAUSED", "ENDED")
 
 def _in(col: str, values: tuple[str, ...]) -> str:
     return f"{col} IN ({', '.join(repr(v) for v in values)})"
+
+
+TX_SIGN_CHECK = (
+    f"({_in('kind', TX_POSITIVE_KINDS)} AND amount_cents > 0)"
+    f" OR ({_in('kind', TX_NEGATIVE_KINDS)} AND amount_cents < 0)"
+    " OR kind = 'ADJUSTMENT'"
+)
 
 
 class AppSettings(Base, Timestamps):
@@ -107,12 +125,7 @@ class Transaction(Base, UUIDPk, Timestamps):
         CheckConstraint(_in("kind", TX_KINDS), name="kind_valid"),
         CheckConstraint(_in("status", TX_STATUSES), name="status_valid"),
         CheckConstraint("amount_cents <> 0", name="amount_nonzero"),
-        CheckConstraint(
-            "(kind IN ('INCOME','TRANSFER_IN') AND amount_cents > 0)"
-            " OR (kind IN ('EXPENSE','TRANSFER_OUT') AND amount_cents < 0)"
-            " OR kind = 'ADJUSTMENT'",
-            name="sign_matches_kind",
-        ),
+        CheckConstraint(TX_SIGN_CHECK, name="sign_matches_kind"),
         CheckConstraint(
             "(kind IN ('TRANSFER_IN','TRANSFER_OUT')) = (transfer_group_id IS NOT NULL)",
             name="transfer_group_consistent",
@@ -369,3 +382,85 @@ class BillInstallment(Base, UUIDPk, Timestamps):
     bill: Mapped[Bill] = relationship(lazy="select")
     recurrence: Mapped[BillRecurrence | None] = relationship(lazy="select")
     transaction: Mapped[Transaction | None] = relationship(lazy="select")
+
+
+# ---------- Etapa 4 — Valores com terceiros ----------
+
+class PartyBalance(Base, UUIDPk, Timestamps):
+    """Valor a receber de / a devolver para um contato (que NÃO é usuário).
+
+    Saldo em aberto = principal + encargos − descontos − acertos ativos (sempre derivado).
+    """
+
+    __tablename__ = "party_balances"
+    __table_args__ = (
+        CheckConstraint(_in("direction", PARTY_DIRECTIONS), name="direction_valid"),
+        CheckConstraint(_in("origin_type", PARTY_ORIGINS), name="origin_valid"),
+        CheckConstraint("principal_cents > 0", name="principal_positive"),
+        CheckConstraint(
+            "(origin_type IN ('LOAN_GIVEN','ADVANCE','OWED_TO_ME') AND direction = 'RECEIVABLE')"
+            " OR (origin_type IN ('LOAN_TAKEN','I_OWE') AND direction = 'PAYABLE')",
+            name="origin_direction_consistent",
+        ),
+        CheckConstraint(
+            "(origin_type IN ('LOAN_GIVEN','LOAN_TAKEN','ADVANCE')) = (origin_transaction_id IS NOT NULL)",
+            name="cash_origin_consistent",
+        ),
+        Index("ix_party_balances_person", "person_id"),
+        Index("ix_party_balances_due", "due_date"),
+    )
+
+    person_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persons.id", ondelete="RESTRICT"))
+    direction: Mapped[str] = mapped_column(String(12))
+    origin_type: Mapped[str] = mapped_column(String(20))
+    description: Mapped[str] = mapped_column(String(160))
+    principal_cents: Mapped[int] = mapped_column(BigInteger)
+    operation_date: Mapped[date] = mapped_column(Date)
+    due_date: Mapped[date | None] = mapped_column(Date)
+    account_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("financial_accounts.id", ondelete="RESTRICT"))
+    origin_transaction_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("transactions.id", ondelete="RESTRICT"))
+    notes: Mapped[str | None] = mapped_column(Text)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancel_reason: Mapped[str | None] = mapped_column(String(200))
+
+    person: Mapped[Person] = relationship(lazy="joined")
+    account: Mapped[FinancialAccount | None] = relationship(lazy="joined")
+
+
+class PartySettlement(Base, UUIDPk, Timestamps):
+    """Acerto (parcial ou integral) de um PartyBalance, sempre com movimento de caixa."""
+
+    __tablename__ = "party_settlements"
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="amount_positive"),
+        Index("ix_party_settlements_balance", "party_balance_id"),
+        Index("ix_party_settlements_transaction", "transaction_id", unique=True),
+    )
+
+    party_balance_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("party_balances.id", ondelete="RESTRICT"))
+    transaction_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("transactions.id", ondelete="RESTRICT"))
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    settled_on: Mapped[date] = mapped_column(Date)
+    notes: Mapped[str | None] = mapped_column(Text)
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reverse_reason: Mapped[str | None] = mapped_column(String(200))
+
+    transaction: Mapped[Transaction] = relationship(lazy="joined")
+
+
+class PartyAdjustment(Base, UUIDPk, Timestamps):
+    """Encargo (juros/multa) ou desconto (inclui perdão) sobre um PartyBalance. Não movimenta caixa."""
+
+    __tablename__ = "party_adjustments"
+    __table_args__ = (
+        CheckConstraint(_in("kind", PARTY_ADJUSTMENT_KINDS), name="kind_valid"),
+        CheckConstraint("amount_cents > 0", name="amount_positive"),
+        Index("ix_party_adjustments_balance", "party_balance_id"),
+    )
+
+    party_balance_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("party_balances.id", ondelete="RESTRICT"))
+    kind: Mapped[str] = mapped_column(String(10))
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    applied_on: Mapped[date] = mapped_column(Date)
+    reason: Mapped[str] = mapped_column(String(200))
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

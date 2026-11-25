@@ -27,5 +27,15 @@ Obrigações, recorrências idempotentes, estimado × real, calendário, alertas
 ## Etapa 4 — Valores com terceiros
 Empréstimos, adiantamentos, acertos parciais, tela por pessoa.
 
+- [x] `party_balances` / `party_settlements` / `party_adjustments` (migração 0004) e kinds
+      `LOAN_OUT`, `LOAN_IN`, `SETTLEMENT_IN`, `SETTLEMENT_OUT` — nunca contam como receita/despesa
+- [x] Tipos: emprestei, paguei por alguém, peguei emprestado, alguém me deve, eu devo
+- [x] Acertos parciais idempotentes, estorno, juros/desconto (perdão), cancelamento sem acertos ativos
+- [x] Saldo em aberto derivado; status OPEN/PARTIALLY_SETTLED/SETTLED/OVERDUE/CANCELLED; sem compensação automática
+- [x] Lançamentos gerados só podem ser desfeitos pelo módulo (`managed_by_parties`)
+- [x] Calendário (`PARTY_BALANCE`), KPIs `receivables`/`payables` no dashboard
+- [x] Telas `/terceiros` e `/pessoas/:id`
+- [ ] Parcelamento combinado de empréstimo, comprovantes, juros recebidos como receita financeira separada
+
 ## Etapa 5 — Inteligência e acabamento
 Orçamentos, metas, projeção 30/60/90, relatórios, exportações, backup/restore.

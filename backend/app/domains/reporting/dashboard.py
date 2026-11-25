@@ -8,6 +8,7 @@ from app.core.errors import DomainError
 from app.domains.ledger.rules import EXPENSE_KINDS, INCOME_KINDS
 from app.domains.ledger.service import balances
 from app.domains.money import pct_change
+from app.domains.parties.service import open_totals as party_open_totals
 from app.domains.support import today_local
 from app.models import Category, FinancialAccount, Transaction
 from app.schemas.dashboard import BalancePoint, CategorySlice, Dashboard, Health, Kpi, MonthPoint
@@ -90,6 +91,8 @@ def build_dashboard(db: Session, period_from: date, period_to: date) -> Dashboar
         _sum(db, planned_active, Transaction.kind == "EXPENSE", Transaction.effective_date <= free_until)
     )
 
+    receivable_open, payable_open = party_open_totals(db)
+
     kpis = {
         "available_balance": Kpi(
             value_cents=available,
@@ -114,6 +117,14 @@ def build_dashboard(db: Session, period_from: date, period_to: date) -> Dashboar
         "projected": Kpi(
             value_cents=available + planned_in - planned_out,
             formula=f"Saldo disponível + receitas previstas − despesas previstas (incluindo vencidas) até {HORIZON_DAYS} dias. Estimativa, não garantia.",
+        ),
+        "receivables": Kpi(
+            value_cents=receivable_open,
+            formula="Quanto terceiros me devem hoje: principal + encargos − descontos − acertos. Não é receita.",
+        ),
+        "payables": Kpi(
+            value_cents=payable_open,
+            formula="Quanto devo a terceiros hoje: principal + encargos − descontos − acertos. Não é despesa.",
         ),
     }
 

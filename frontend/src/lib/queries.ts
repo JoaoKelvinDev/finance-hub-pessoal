@@ -5,6 +5,9 @@ import type {
   Bill,
   BillInstallment,
   CalendarResponse,
+  PartyBalanceDetail,
+  PartyBalancePage,
+  PersonPosition,
   BillInstallmentPage,
   CardInstallment,
   CardPurchase,
@@ -43,6 +46,9 @@ export const keys = {
   upcomingInstallments: (days: number) => ['bills', 'installments', 'upcoming', days] as const,
   overdueInstallments: (limit: number) => ['bills', 'installments', 'overdue', limit] as const,
   calendar: (from: string, to: string) => ['calendar', from, to] as const,
+  parties: (q: object) => ['parties', q] as const,
+  party: (id: string) => ['parties', 'detail', id] as const,
+  personPosition: (id: string) => ['parties', 'person', id] as const,
 }
 
 export function useCalendar(from: string, to: string) {
@@ -119,7 +125,7 @@ function useFinanceMutation<TVars, TOut>(fn: (v: TVars) => Promise<TOut>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar']) {
+      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar', 'parties']) {
         void qc.invalidateQueries({ queryKey: [k] })
       }
     },
@@ -387,3 +393,53 @@ export const useCancelBillInstallment = () =>
 
 export const useAutoPostBills = () =>
   useFinanceMutation((body: Record<string, unknown>) => api<BillInstallment[]>('/bills/auto-post', { method: 'POST', body }))
+
+// ---------- Valores com terceiros ----------
+
+export function usePartyBalances(filters: { person_id?: string; direction?: string; include_cancelled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.parties(filters),
+    queryFn: ({ signal }) => api<PartyBalancePage>('/party-balances', { query: filters, signal }),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function usePartyBalance(id: string | null) {
+  return useQuery({
+    queryKey: keys.party(id ?? ''),
+    queryFn: ({ signal }) => api<PartyBalanceDetail>(`/party-balances/${id}`, { signal }),
+    enabled: !!id,
+  })
+}
+
+export function usePersonPosition(personId: string) {
+  return useQuery({
+    queryKey: keys.personPosition(personId),
+    queryFn: ({ signal }) => api<PersonPosition>(`/people/${personId}/position`, { signal }),
+  })
+}
+
+export const useCreatePartyBalance = () =>
+  useFinanceMutation((body: Record<string, unknown>) =>
+    api<PartyBalanceDetail>('/party-balances', { method: 'POST', body }),
+  )
+
+export const useSettlePartyBalance = () =>
+  useFinanceMutation(({ id, ...body }: { id: string } & Record<string, unknown>) =>
+    api<PartyBalanceDetail>(`/party-balances/${id}/settlements`, { method: 'POST', body }),
+  )
+
+export const useAdjustPartyBalance = () =>
+  useFinanceMutation(({ id, ...body }: { id: string } & Record<string, unknown>) =>
+    api<PartyBalanceDetail>(`/party-balances/${id}/adjustments`, { method: 'POST', body }),
+  )
+
+export const useReversePartySettlement = () =>
+  useFinanceMutation(({ settlementId, reason }: { settlementId: string; reason: string }) =>
+    api<PartyBalanceDetail>(`/party-balances/settlements/${settlementId}/reverse`, { method: 'POST', body: { reason } }),
+  )
+
+export const useCancelPartyBalance = () =>
+  useFinanceMutation(({ id, reason }: { id: string; reason: string }) =>
+    api<PartyBalanceDetail>(`/party-balances/${id}/cancel`, { method: 'POST', body: { reason } }),
+  )

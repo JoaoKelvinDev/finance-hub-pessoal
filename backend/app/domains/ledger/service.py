@@ -157,6 +157,13 @@ def cancel_transaction(db: Session, tx_id: uuid.UUID, reason: str, request_id: s
     tx = get_transaction(db, tx_id)
     if tx.status == "CANCELLED":
         raise DomainError("already_cancelled", "Lançamento já cancelado.", status_code=409)
+    if tx.source_type in ("party_balance", "party_settlement"):
+        # Cancelar aqui deixaria o saldo com o terceiro inconsistente.
+        raise DomainError(
+            "managed_by_parties",
+            "Este lançamento pertence a Valores com terceiros; cancele ou estorne por lá.",
+            status_code=409,
+        )
     targets = list(transfer_legs(db, tx.transfer_group_id)) if tx.transfer_group_id else [tx]
     now = datetime.now(UTC)
     for t in targets:

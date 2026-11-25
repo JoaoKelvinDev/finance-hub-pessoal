@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Archive, ArchiveRestore, Plus, Users } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { EmptyState, ErrorState } from '@/components/finance/states'
 import { ListSkeleton } from '@/components/finance/transaction-list'
@@ -37,7 +38,7 @@ export function PeoplePage() {
           <EmptyState
             icon={<Users />}
             title="Nenhum contato"
-            description="Cadastre familiares ou conhecidos para registrar rateios e empréstimos nas próximas etapas."
+            description="Cadastre familiares ou conhecidos para registrar empréstimos, adiantamentos e dívidas."
           />
         ) : (
           <ul className="divide-y divide-border">
@@ -56,7 +57,9 @@ export function PeoplePage() {
                     {p.display_name.slice(0, 1).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{p.display_name}</p>
+                    <Link to={`/pessoas/${p.id}`} className="block truncate text-sm font-medium hover:underline">
+                      {p.display_name}
+                    </Link>
                     <p className="truncate text-xs text-muted">{[p.contact, p.notes].filter(Boolean).join(' · ') || 'Sem detalhes'}</p>
                   </div>
                   <Button

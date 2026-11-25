@@ -4,6 +4,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   CalendarClock,
+  HandCoins,
+  Handshake,
   Info,
   Landmark,
   Plus,
@@ -144,6 +146,8 @@ export function DashboardPage() {
               emphasis={data.kpis.overdue.value_cents > 0 ? 'danger' : 'default'}
             />
             <FinancialKpi label="Disponível projetado (30 dias)" kpi={data.kpis.projected} icon={<TrendingUp />} />
+            <FinancialKpi label="Terceiros me devem" kpi={data.kpis.receivables} icon={<HandCoins />} to="/terceiros" />
+            <FinancialKpi label="Devo a terceiros" kpi={data.kpis.payables} icon={<Handshake />} to="/terceiros" />
           </motion.div>
 
           {/* Gráficos */}

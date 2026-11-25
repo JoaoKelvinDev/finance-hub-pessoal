@@ -17,7 +17,9 @@ import { CardDetailPage } from '@/pages/card-detail'
 import { ComingSoonPage } from '@/pages/coming-soon'
 import { DashboardPage } from '@/pages/dashboard'
 import { LoginPage } from '@/pages/login'
+import { PartiesPage } from '@/pages/parties'
 import { PeoplePage } from '@/pages/people'
+import { PersonDetailPage } from '@/pages/person-detail'
 import { SettingsPage } from '@/pages/settings'
 import { TransactionsPage } from '@/pages/transactions'
 import './index.css'
@@ -63,6 +65,9 @@ const router = createBrowserRouter([
       { path: '/calendario', element: <CalendarPage /> },
       { path: '/em-breve/calendario', element: <Navigate to="/calendario" replace /> },
       { path: '/pessoas', element: <PeoplePage /> },
+      { path: '/pessoas/:id', element: <PersonDetailPage /> },
+      { path: '/terceiros', element: <PartiesPage /> },
+      { path: '/em-breve/terceiros', element: <Navigate to="/terceiros" replace /> },
       { path: '/configuracoes', element: <SettingsPage /> },
       { path: '/em-breve/:mod', element: <ComingSoonPage /> },
       { path: '*', element: <Navigate to="/" replace /> },

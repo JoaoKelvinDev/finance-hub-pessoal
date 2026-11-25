@@ -7,7 +7,10 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 from app.schemas.common import MAX_CENTS, ORM, Color, IdemKey, Name
 
 AccountType = Literal["CHECKING", "SAVINGS", "CASH", "DIGITAL_WALLET", "OTHER"]
-TxKind = Literal["INCOME", "EXPENSE", "TRANSFER_IN", "TRANSFER_OUT", "ADJUSTMENT"]
+TxKind = Literal[
+    "INCOME", "EXPENSE", "TRANSFER_IN", "TRANSFER_OUT", "ADJUSTMENT",
+    "LOAN_OUT", "LOAN_IN", "SETTLEMENT_IN", "SETTLEMENT_OUT",
+]
 TxStatus = Literal["PLANNED", "POSTED", "CANCELLED"]
 Description = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]

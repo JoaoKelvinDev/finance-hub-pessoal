@@ -1,5 +1,14 @@
 export type AccountType = 'CHECKING' | 'SAVINGS' | 'CASH' | 'DIGITAL_WALLET' | 'OTHER'
-export type TxKind = 'INCOME' | 'EXPENSE' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'ADJUSTMENT'
+export type TxKind =
+  | 'INCOME'
+  | 'EXPENSE'
+  | 'TRANSFER_IN'
+  | 'TRANSFER_OUT'
+  | 'ADJUSTMENT'
+  | 'LOAN_OUT'
+  | 'LOAN_IN'
+  | 'SETTLEMENT_IN'
+  | 'SETTLEMENT_OUT'
 export type TxStatus = 'PLANNED' | 'POSTED' | 'CANCELLED'
 
 export type CardType = 'CREDIT' | 'DEBIT' | 'PREPAID'
@@ -219,7 +228,10 @@ export interface Dashboard {
   period_to: string
   today: string
   timezone: string
-  kpis: Record<'available_balance' | 'income' | 'expense' | 'net' | 'due_soon' | 'overdue' | 'projected', Kpi>
+  kpis: Record<
+    'available_balance' | 'income' | 'expense' | 'net' | 'due_soon' | 'overdue' | 'projected' | 'receivables' | 'payables',
+    Kpi
+  >
   free_after_commitments_cents: number
   free_until: string
   monthly: { month: string; income_cents: number; expense_cents: number; net_cents: number; partial: boolean }[]
@@ -241,7 +253,12 @@ export interface Dashboard {
 
 // ---------- Calendário ----------
 
-export type CalendarSource = 'CARD_STATEMENT' | 'BILL_INSTALLMENT' | 'RECURRENCE_FORECAST' | 'PLANNED_TRANSACTION'
+export type CalendarSource =
+  | 'CARD_STATEMENT'
+  | 'BILL_INSTALLMENT'
+  | 'RECURRENCE_FORECAST'
+  | 'PLANNED_TRANSACTION'
+  | 'PARTY_BALANCE'
 export type CalendarStatus = 'PENDING' | 'OVERDUE' | 'PARTIAL' | 'PAID' | 'FORECAST' | 'SKIPPED' | 'REVERSED'
 
 export interface CalendarEvent {
@@ -281,6 +298,86 @@ export interface CalendarResponse {
   }
   days: CalendarDay[]
   events: CalendarEvent[]
+}
+
+// ---------- Valores com terceiros ----------
+
+export type PartyDirection = 'RECEIVABLE' | 'PAYABLE'
+export type PartyOrigin = 'LOAN_GIVEN' | 'LOAN_TAKEN' | 'ADVANCE' | 'OWED_TO_ME' | 'I_OWE'
+export type PartyStatus = 'OPEN' | 'PARTIALLY_SETTLED' | 'SETTLED' | 'OVERDUE' | 'CANCELLED'
+
+export interface PartyBalance {
+  id: string
+  person_id: string
+  person_name: string
+  direction: PartyDirection
+  origin_type: PartyOrigin
+  description: string
+  principal_cents: number
+  charges_cents: number
+  discounts_cents: number
+  settled_cents: number
+  open_cents: number
+  operation_date: string
+  due_date: string | null
+  account_id: string | null
+  account_name: string | null
+  origin_transaction_id: string | null
+  status: PartyStatus
+  notes: string | null
+  cancel_reason: string | null
+  created_at: string
+}
+
+export interface PartySettlement {
+  id: string
+  party_balance_id: string
+  transaction_id: string
+  account_id: string
+  account_name: string
+  amount_cents: number
+  settled_on: string
+  notes: string | null
+  reversed_at: string | null
+  reverse_reason: string | null
+  created_at: string
+}
+
+export interface PartyAdjustment {
+  id: string
+  kind: 'CHARGE' | 'DISCOUNT'
+  amount_cents: number
+  applied_on: string
+  reason: string
+  created_at: string
+}
+
+export interface PartyBalanceDetail extends PartyBalance {
+  settlements: PartySettlement[]
+  adjustments: PartyAdjustment[]
+}
+
+export interface PartySummary {
+  receivable_open_cents: number
+  payable_open_cents: number
+  receivable_overdue_cents: number
+  payable_overdue_cents: number
+  open_count: number
+}
+
+export interface PartyBalancePage {
+  items: PartyBalance[]
+  summary: PartySummary
+}
+
+export interface PersonPosition {
+  person_id: string
+  person_name: string
+  contact: string | null
+  archived: boolean
+  summary: PartySummary
+  net_cents: number
+  balances: PartyBalanceDetail[]
 }
 
 export interface ApiErrorBody {

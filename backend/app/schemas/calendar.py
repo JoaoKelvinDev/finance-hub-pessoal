@@ -4,7 +4,9 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-CalendarSource = Literal["CARD_STATEMENT", "BILL_INSTALLMENT", "RECURRENCE_FORECAST", "PLANNED_TRANSACTION"]
+CalendarSource = Literal[
+    "CARD_STATEMENT", "BILL_INSTALLMENT", "RECURRENCE_FORECAST", "PLANNED_TRANSACTION", "PARTY_BALANCE"
+]
 CalendarStatus = Literal["PENDING", "OVERDUE", "PARTIAL", "PAID", "FORECAST", "SKIPPED", "REVERSED"]
 
 
@@ -12,7 +14,8 @@ class CalendarEvent(BaseModel):
     key: str
     source: CalendarSource
     source_id: uuid.UUID
-    # Entidade para navegação: cartão (fatura), conta da casa (parcela/previsão) ou conta financeira (lançamento).
+    # Entidade para navegação: cartão (fatura), conta da casa (parcela/previsão), conta financeira
+    # (lançamento) ou pessoa (valor com terceiro).
     ref_id: uuid.UUID
     date: date
     title: str

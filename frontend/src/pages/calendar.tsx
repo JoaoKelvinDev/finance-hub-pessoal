@@ -11,6 +11,7 @@ import {
   CircleDashed,
   Clock,
   CreditCard,
+  HandCoins,
   Receipt,
   Repeat,
   SkipForward,
@@ -45,6 +46,7 @@ const SOURCES: Record<CalendarSource, { label: string; icon: LucideIcon }> = {
   BILL_INSTALLMENT: { label: 'Conta da casa', icon: Receipt },
   RECURRENCE_FORECAST: { label: 'Previsão de recorrência', icon: Repeat },
   PLANNED_TRANSACTION: { label: 'Lançamento previsto', icon: ArrowLeftRight },
+  PARTY_BALANCE: { label: 'Valor com terceiro', icon: HandCoins },
 }
 
 const STATUS: Record<CalendarStatus, { label: string; icon: LucideIcon; cls: string }> = {
@@ -175,6 +177,9 @@ export function CalendarPage() {
       case 'PLANNED_TRANSACTION':
         navigate('/lancamentos')
         break
+      case 'PARTY_BALANCE':
+        navigate(`/pessoas/${e.ref_id}`)
+        break
     }
   }
 
@@ -185,7 +190,7 @@ export function CalendarPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Calendário financeiro</h1>
-          <p className="mt-0.5 text-muted">Vencimentos de faturas, contas da casa, recorrências e lançamentos previstos.</p>
+          <p className="mt-0.5 text-muted">Vencimentos de faturas, contas da casa, recorrências, terceiros e lançamentos previstos.</p>
         </div>
         <Segmented
           label="Visualização do calendário"

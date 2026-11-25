@@ -1,28 +1,53 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Check, MoreHorizontal, Scale, XCircle } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
+  Check,
+  HandCoins,
+  Handshake,
+  MoreHorizontal,
+  Scale,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react'
 import { DropdownMenu } from 'radix-ui'
 import { CurrencyDisplay } from '@/components/finance/currency'
 import { StatusBadge } from '@/components/finance/states'
 import { formatDate, todayISO } from '@/lib/date'
 import { listItem } from '@/lib/motion'
 import { cn } from '@/lib/utils'
-import type { Transaction } from '@/types/api'
+import type { Transaction, TxKind } from '@/types/api'
 
-const KIND_ICON = {
+const KIND_ICON: Record<TxKind, LucideIcon> = {
   INCOME: ArrowDownLeft,
   EXPENSE: ArrowUpRight,
   TRANSFER_IN: ArrowLeftRight,
   TRANSFER_OUT: ArrowLeftRight,
   ADJUSTMENT: Scale,
+  LOAN_OUT: HandCoins,
+  LOAN_IN: HandCoins,
+  SETTLEMENT_IN: Handshake,
+  SETTLEMENT_OUT: Handshake,
 }
 
-const KIND_LABEL = {
+const KIND_LABEL: Record<TxKind, string> = {
   INCOME: 'Receita',
   EXPENSE: 'Despesa',
   TRANSFER_IN: 'Transferência recebida',
   TRANSFER_OUT: 'Transferência enviada',
   ADJUSTMENT: 'Ajuste',
+  LOAN_OUT: 'Empréstimo/adiantamento concedido',
+  LOAN_IN: 'Empréstimo recebido',
+  SETTLEMENT_IN: 'Acerto recebido de terceiro',
+  SETTLEMENT_OUT: 'Acerto pago a terceiro',
 }
+
+/** Movimentos que não são receita nem despesa: exibidos em tom neutro. */
+const NEUTRAL_KINDS: TxKind[] = [
+  'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT', 'LOAN_OUT', 'LOAN_IN', 'SETTLEMENT_IN', 'SETTLEMENT_OUT',
+]
+const PARTY_KINDS: TxKind[] = ['LOAN_OUT', 'LOAN_IN', 'SETTLEMENT_IN', 'SETTLEMENT_OUT']
 
 interface Props {
   items: Transaction[]
@@ -41,6 +66,9 @@ export function TransactionList({ items, onCancel, onPost, compact }: Props) {
           const Icon = KIND_ICON[t.kind]
           const overdue = t.status === 'PLANNED' && t.effective_date < today
           const transfer = t.kind === 'TRANSFER_IN' || t.kind === 'TRANSFER_OUT'
+          const neutral = NEUTRAL_KINDS.includes(t.kind)
+          // Lançamentos de terceiros são desfeitos pela tela de terceiros (o backend recusa aqui).
+          const managed = PARTY_KINDS.includes(t.kind)
           return (
             <motion.li
               key={t.id}
@@ -59,7 +87,7 @@ export function TransactionList({ items, onCancel, onPost, compact }: Props) {
                   'grid size-9 shrink-0 place-items-center rounded-xl',
                   t.kind === 'INCOME' && 'bg-positive-soft text-positive',
                   t.kind === 'EXPENSE' && 'bg-negative-soft text-negative',
-                  (transfer || t.kind === 'ADJUSTMENT') && 'bg-surface-2 text-muted',
+                  neutral && 'bg-surface-2 text-muted',
                 )}
                 title={KIND_LABEL[t.kind]}
               >
@@ -89,12 +117,12 @@ export function TransactionList({ items, onCancel, onPost, compact }: Props) {
               <CurrencyDisplay
                 cents={t.amount_cents}
                 signed
-                tone={!transfer}
+                tone={!neutral}
                 animated={false}
-                className={cn('shrink-0 text-sm font-semibold', transfer && 'text-muted')}
+                className={cn('shrink-0 text-sm font-semibold', neutral && 'text-muted')}
               />
 
-              {(onCancel || onPost) && t.status !== 'CANCELLED' && (
+              {(onCancel || onPost) && t.status !== 'CANCELLED' && !managed && (
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger
                     className="grid size-8 shrink-0 place-items-center rounded-lg text-muted opacity-100 hover:bg-surface-2 hover:text-fg sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
