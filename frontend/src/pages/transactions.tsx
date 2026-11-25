@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuickAdd } from '@/app/layout'
 import { CurrencyDisplay } from '@/components/finance/currency'
+import { ExportButton } from '@/components/finance/export-button'
 import { PeriodPicker, usePeriod } from '@/components/finance/period-picker'
 import { EmptyState, ErrorState } from '@/components/finance/states'
 import { ListSkeleton, TransactionList } from '@/components/finance/transaction-list'
@@ -71,6 +72,7 @@ export function TransactionsPage() {
             { value: 'transfer', label: 'Transferências' },
           ]}
         />
+        <ExportButton kind="transactions" from={period.from} to={period.to} />
         <Button variant="secondary" onClick={() => quickAdd(group === 'income' ? 'INCOME' : group === 'transfer' ? 'TRANSFER' : 'EXPENSE')}>
           <Plus /> Lançar
         </Button>

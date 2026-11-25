@@ -5,6 +5,10 @@ import type {
   Bill,
   BillInstallment,
   AlertList,
+  CardReport,
+  CashFlowReport,
+  CategoryReport,
+  CounterpartyReport,
   Budget,
   Goal,
   Projection,
@@ -581,3 +585,21 @@ export function useRecentPurchases(limit = 6) {
     queryFn: ({ signal }) => api<CardPurchase[]>('/cards/purchases/recent', { query: { limit }, signal }),
   })
 }
+
+// ---------- Relatórios ----------
+
+function useReport<T>(name: string, from: string, to: string, extra: Record<string, string> = {}) {
+  return useQuery({
+    queryKey: ['reports', name, from, to, extra],
+    queryFn: ({ signal }) => api<T>(`/reports/${name}`, { query: { from, to, ...extra }, signal }),
+    placeholderData: keepPreviousData,
+    enabled: !!from && !!to,
+  })
+}
+
+export const useCategoryReport = (from: string, to: string, basis: string) =>
+  useReport<CategoryReport>('categories', from, to, { basis })
+export const useCashFlowReport = (from: string, to: string) => useReport<CashFlowReport>('cash-flow', from, to)
+export const useCardReport = (from: string, to: string) => useReport<CardReport>('cards', from, to)
+export const useCounterpartyReport = (from: string, to: string) =>
+  useReport<CounterpartyReport>('counterparties', from, to)

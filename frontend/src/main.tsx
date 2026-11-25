@@ -26,6 +26,7 @@ import './index.css'
 
 // Planejamento (orçamentos/metas/projeção) carrega sob demanda.
 const PlanningPage = lazy(() => import('@/pages/planning').then((m) => ({ default: m.PlanningPage })))
+const ReportsPage = lazy(() => import('@/pages/reports').then((m) => ({ default: m.ReportsPage })))
 
 const queryClient: QueryClient = new QueryClient({
   // Qualquer mutação bem-sucedida pode alterar vencimentos: o calendário é sempre revalidado.
@@ -79,6 +80,15 @@ const router = createBrowserRouter([
         ),
       },
       { path: '/em-breve/planejamento', element: <Navigate to="/planejamento" replace /> },
+      {
+        path: '/relatorios',
+        element: (
+          <Suspense fallback={<div className="shimmer h-96 rounded-2xl" />}>
+            <ReportsPage />
+          </Suspense>
+        ),
+      },
+      { path: '/em-breve/relatorios', element: <Navigate to="/relatorios" replace /> },
       { path: '/em-breve/terceiros', element: <Navigate to="/terceiros" replace /> },
       { path: '/configuracoes', element: <SettingsPage /> },
       { path: '/em-breve/:mod', element: <ComingSoonPage /> },

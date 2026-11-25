@@ -61,3 +61,32 @@ export async function api<T>(
     body?.error.details,
   )
 }
+
+/** Baixa um arquivo da API com a sessão do proprietário (link simples não leva o token). */
+export async function apiDownload(path: string, query?: Query): Promise<string> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch(buildUrl(path, query), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    let message = 'Não foi possível gerar o arquivo.'
+    try {
+      message = ((await res.json()) as ApiErrorBody).error.message
+    } catch {
+      /* corpo não-JSON */
+    }
+    throw new ApiError(res.status, 'download_failed', message)
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'finance-hub.csv'
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  return name
+}

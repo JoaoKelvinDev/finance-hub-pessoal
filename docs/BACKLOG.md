@@ -55,6 +55,9 @@ Orçamentos, metas, projeção 30/60/90, relatórios, exportações, backup/rest
 - [x] Projeção diária 30/60/90 (`GET /projection`), cenários conservador e base; cartão só pela fatura
 - [x] Tela `/planejamento` (Orçamentos, Metas, Projeção) e cartão de metas no dashboard
 - [x] Ícones de marca locais (`simple-icons`, sem serviço externo) com selo do cartão nas compras
-- [ ] Relatórios: por categoria, período, cartão e pessoa; aging de recebíveis (0–30 / 31–60 / 61–90 / 90+)
-- [ ] Exportação CSV (UTF-8) e XLSX/PDF progressivas
-- [ ] Performance das consultas, observabilidade e backup/restore testado
+- [x] Relatórios: por categoria (caixa/competência, subcategorias, comparação), fluxo de caixa, cartão e pessoa;
+      aging de recebíveis (a vencer / 1–30 / 31–60 / 61–90 / 90+ / sem vencimento) — `/relatorios`
+- [x] Exportação CSV para Excel pt-BR (";", vírgula decimal, UTF-8 com BOM), auditada
+- [ ] XLSX/PDF
+- [x] Backup completo em JSON e restauração por CLI só em banco vazio (testada ida e volta)
+- [ ] Performance das consultas e observabilidade

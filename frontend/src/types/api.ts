@@ -513,6 +513,88 @@ export interface Projection {
   points: { date: string; conservative_cents: number; base_cents: number }[]
 }
 
+// ---------- Relatórios ----------
+
+export interface CategoryReportRow {
+  category_id: string | null
+  name: string
+  color: string
+  amount_cents: number
+  previous_cents: number
+  share_pct: number
+  change_pct: number | null
+  children: CategoryReportRow[]
+}
+
+export interface CategoryReport {
+  date_from: string
+  date_to: string
+  previous_from: string
+  previous_to: string
+  basis: BudgetBasis
+  total_cents: number
+  previous_total_cents: number
+  rows: CategoryReportRow[]
+}
+
+export interface CashFlowReport {
+  date_from: string
+  date_to: string
+  granularity: 'day' | 'month'
+  income_cents: number
+  expense_cents: number
+  net_cents: number
+  points: { period: string; income_cents: number; expense_cents: number; net_cents: number }[]
+}
+
+export interface CardReportRow {
+  card_id: string
+  name: string
+  bank: string | null
+  color: string
+  limit_cents: number
+  purchases_cents: number
+  purchases_count: number
+  paid_cents: number
+  open_cents: number
+  future_cents: number
+  top_merchants: { name: string; amount_cents: number; count: number }[]
+}
+
+export interface CardReport {
+  date_from: string
+  date_to: string
+  purchases_cents: number
+  paid_cents: number
+  open_cents: number
+  future_cents: number
+  cards: CardReportRow[]
+}
+
+export interface AgingBuckets {
+  current_cents: number
+  d0_30_cents: number
+  d31_60_cents: number
+  d61_90_cents: number
+  d90_plus_cents: number
+  no_due_cents: number
+}
+
+export interface CounterpartyReport {
+  today: string
+  receivable_cents: number
+  payable_cents: number
+  receivable_aging: AgingBuckets
+  people: {
+    person_id: string
+    name: string
+    receivable_cents: number
+    payable_cents: number
+    receivable_aging: AgingBuckets
+    settled_in_period_cents: number
+  }[]
+}
+
 export interface ApiErrorBody {
   error: { code: string; message: string; details: unknown; request_id: string | null }
 }

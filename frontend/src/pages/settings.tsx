@@ -1,4 +1,4 @@
-import { Monitor, Moon, Plus, Sun } from 'lucide-react'
+import { DatabaseBackup, Monitor, Moon, Plus, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useTheme, type ThemePref } from '@/app/theme'
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, Skeleton } from '@/components/ui/card'
 import { Input, Select } from '@/components/ui/field'
 import { Segmented } from '@/components/ui/misc'
-import { ApiError } from '@/lib/api'
+import { ApiError, apiDownload } from '@/lib/api'
 import { useAppSettings, useCategories, useCreateCategory, useUpdateSettings } from '@/lib/queries'
 import type { Category } from '@/types/api'
 
@@ -37,6 +37,7 @@ export function SettingsPage() {
       </Card>
 
       <AlertSettingsCard />
+      <BackupCard />
 
       <Card>
         <CardHeader
@@ -85,7 +86,7 @@ export function SettingsPage() {
         <ul className="space-y-1 px-5 pb-5 text-sm text-muted">
           <li>Uso individual: há um único proprietário e nenhum cadastro público.</li>
           <li>Moeda BRL · fuso America/Fortaleza · valores armazenados em centavos.</li>
-          <li>Cartões, contas da casa, terceiros e planejamento chegam nas próximas etapas.</li>
+          <li>Inclui cartões, contas da casa, terceiros, planejamento, relatórios e backup.</li>
         </ul>
       </Card>
     </div>
@@ -177,6 +178,41 @@ function AlertSettingsCard() {
           Salvar
         </Button>
       </form>
+    </Card>
+  )
+}
+
+function BackupCard() {
+  const [busy, setBusy] = useState(false)
+  return (
+    <Card>
+      <CardHeader
+        title="Backup"
+        description="Baixa todos os seus dados em um arquivo JSON. Guarde-o em local seguro: ele contém sua vida financeira."
+      />
+      <div className="space-y-3 px-5 pb-5">
+        <Button
+          variant="secondary"
+          loading={busy}
+          onClick={async () => {
+            setBusy(true)
+            try {
+              const name = await apiDownload('/backup')
+              toast.success(`Backup ${name} baixado.`)
+            } catch (err) {
+              toast.error(err instanceof ApiError ? err.message : 'Não foi possível gerar o backup.')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          <DatabaseBackup /> Baixar backup completo
+        </Button>
+        <p className="text-xs text-muted">
+          Para restaurar, use a linha de comando num banco vazio (nunca sobrescreve dados):{' '}
+          <code className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px]">uv run python -m app.cli restore --file backup.json</code>
+        </p>
+      </div>
     </Card>
   )
 }

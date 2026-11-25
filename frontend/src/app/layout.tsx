@@ -49,13 +49,8 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { to: '/calendario', label: 'Calendário', icon: CalendarDays },
       { to: '/terceiros', label: 'Valores com terceiros', icon: HandCoins },
       { to: '/planejamento', label: 'Planejamento', icon: Target },
+      { to: '/relatorios', label: 'Relatórios', icon: ChartPie },
       { to: '/pessoas', label: 'Pessoas', icon: Users },
-    ],
-  },
-  {
-    section: 'Próximas etapas',
-    items: [
-      { to: '/em-breve/relatorios', label: 'Relatórios', icon: ChartPie, stage: 5 },
     ],
   },
 ]
@@ -69,6 +64,7 @@ const TITLES: Record<string, string> = {
   '/calendario': 'Calendário financeiro',
   '/terceiros': 'Valores com terceiros',
   '/planejamento': 'Planejamento',
+  '/relatorios': 'Relatórios',
   '/pessoas': 'Pessoas',
   '/configuracoes': 'Configurações',
 }
