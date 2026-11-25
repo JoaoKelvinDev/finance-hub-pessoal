@@ -6,48 +6,50 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Paleta: grafite/off-white + um destaque azul. Verde/vermelho só para sinal financeiro. */
+/* Paleta: grafite profundo + destaque violeta (tema padrão escuro). Verde/vermelho só para sinal financeiro. */
 :root {
-  --bg: #f7f7f5;
+  --bg: #f6f5fa;
   --surface: #ffffff;
-  --surface-2: #f1f1ee;
-  --fg: #18181b;
-  --muted: #64646b;
-  --border: #e4e4e0;
-  --accent: #2563eb;
+  --surface-2: #f1eff7;
+  --fg: #17151f;
+  --muted: #625f70;
+  --border: #e3e0ec;
+  --accent: #7c3aed;
   --accent-fg: #ffffff;
-  --accent-soft: #e8efff;
-  --positive: #15803d;
-  --positive-soft: #e7f6ec;
+  --accent-soft: #efe8fe;
+  --positive: #047857;
+  --positive-soft: #e3f6ee;
   --negative: #b91c1c;
   --negative-soft: #fdecec;
   --warning: #a35c06;
   --warning-soft: #fdf3e2;
-  --ring: #2563eb;
-  --shadow: 0 1px 2px rgb(16 18 22 / 0.04), 0 1px 1px rgb(16 18 22 / 0.03);
-  --shadow-lg: 0 12px 32px -12px rgb(16 18 22 / 0.18), 0 2px 6px rgb(16 18 22 / 0.06);
+  --ring: #7c3aed;
+  --glow: rgb(124 58 237 / 0.08);
+  --shadow: 0 1px 2px rgb(23 21 31 / 0.05), 0 1px 1px rgb(23 21 31 / 0.03);
+  --shadow-lg: 0 12px 32px -12px rgb(23 21 31 / 0.2), 0 2px 6px rgb(23 21 31 / 0.06);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #0b0d10;
-  --surface: #13161b;
-  --surface-2: #1a1e24;
-  --fg: #e8eaed;
-  --muted: #9aa2ad;
-  --border: #252a32;
-  --accent: #6ea8ff;
-  --accent-fg: #0b0d10;
-  --accent-soft: #16233a;
-  --positive: #4ade80;
-  --positive-soft: #12261a;
+  --bg: #050507;
+  --surface: #111114;
+  --surface-2: #1b1b21;
+  --fg: #ececf1;
+  --muted: #9a99a8;
+  --border: #24242c;
+  --accent: #8b5cf6;
+  --accent-fg: #ffffff;
+  --accent-soft: #221a38;
+  --positive: #34d399;
+  --positive-soft: #0f2a22;
   --negative: #f87171;
-  --negative-soft: #2c1616;
+  --negative-soft: #2e1517;
   --warning: #fbbf24;
-  --warning-soft: #2a2110;
-  --ring: #6ea8ff;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+  --warning-soft: #2b2210;
+  --ring: #a78bfa;
+  --glow: rgb(139 92 246 / 0.14);
+  --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 18px 48px -14px rgb(0 0 0 / 0.75), 0 2px 8px rgb(0 0 0 / 0.5);
   color-scheme: dark;
 }
 
@@ -69,6 +71,7 @@
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
   --color-ring: var(--ring);
+  --color-glow: var(--glow);
   --shadow-card: var(--shadow);
   --shadow-pop: var(--shadow-lg);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -81,6 +84,9 @@
   }
   body {
     @apply bg-bg text-fg font-sans text-[15px] leading-normal;
+    /* Halo violeta discreto no topo, como na referência; fixo para não "andar" com a rolagem. */
+    background-image: radial-gradient(80rem 32rem at 70% -12rem, var(--glow), transparent 70%);
+    background-attachment: fixed;
     /* Troca de tema suave sem animar layout. */
     transition: background-color 240ms var(--ease-out-soft), color 240ms var(--ease-out-soft);
   }

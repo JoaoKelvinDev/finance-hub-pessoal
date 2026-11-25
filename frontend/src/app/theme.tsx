@@ -9,9 +9,9 @@ const ThemeContext = createContext<{ pref: ThemePref; setPref: (p: ThemePref) =>
 function readPref(): ThemePref {
   try {
     const v = localStorage.getItem('fh-theme')
-    return v === 'light' || v === 'dark' ? v : 'system'
+    return v === 'light' || v === 'dark' || v === 'system' ? v : 'dark'
   } catch {
-    return 'system'
+    return 'dark'
   }
 }
 

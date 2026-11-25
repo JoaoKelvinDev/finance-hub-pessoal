@@ -2,7 +2,15 @@ import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-xl border border-border bg-surface shadow-card', className)} {...props} />
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border border-border bg-surface bg-gradient-to-b from-white/[0.025] to-transparent shadow-card',
+        className,
+      )}
+      {...props}
+    />
+  )
 }
 
 export function CardHeader({
