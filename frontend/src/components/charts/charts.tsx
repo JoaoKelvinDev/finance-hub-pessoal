@@ -10,6 +10,8 @@ import {
   Cell,
   Pie,
   PieChart,
+  ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,7 +21,7 @@ import { useTheme } from '@/app/theme'
 import { formatDate, formatMonth, formatShortDate } from '@/lib/date'
 import { formatBRL, formatCompactBRL, formatPct } from '@/lib/money'
 import { cn } from '@/lib/utils'
-import type { Dashboard } from '@/types/api'
+import type { Dashboard, Projection } from '@/types/api'
 
 // Paleta categórica validada (dataviz): passo claro -> passo escuro do mesmo slot.
 const DARK_STEP: Record<string, string> = {
@@ -480,4 +482,83 @@ function slot(hex: string) {
 
 function ChartEmpty({ text }: { text: string }) {
   return <div className="grid h-60 place-items-center px-6 text-center text-sm text-muted">{text}</div>
+}
+
+// ---------- Projeção 30/60/90 ----------
+/** Duas linhas na mesma escala (saldo em R$): cenário base e conservador. */
+export function ProjectionChart({ data }: { data: Projection }) {
+  const rows = data.points
+  const lowest = data.conservative.lowest_date
+  return (
+    <ChartFrame
+      title="Saldo projetado"
+      description={`Próximos ${data.days} dias. Estimativa com o que está cadastrado, não saldo garantido.`}
+      legend={
+        <div className="flex flex-wrap gap-4">
+          <LegendItem color="var(--accent)" label="Base (inclui recorrências e valores a receber de terceiros)" />
+          <LegendItem color="var(--muted)" label="Conservador (só obrigações e receitas já lançadas)" dashed />
+        </div>
+      }
+      table={
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border">
+              <th className={th}>Data</th>
+              <th className={th}>Base</th>
+              <th className={th}>Conservador</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows
+              .filter((_, i) => i % Math.max(1, Math.ceil(rows.length / 30)) === 0 || i === rows.length - 1)
+              .map((p) => (
+                <tr key={p.date} className="border-b border-border/60">
+                  <td className={td}>{formatDate(p.date)}</td>
+                  <td className={td}>{formatBRL(p.base_cents)}</td>
+                  <td className={td}>{formatBRL(p.conservative_cents)}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      }
+    >
+      <div className="h-72">
+        <ResponsiveContainer>
+          <AreaChart data={rows} margin={{ top: 12, right: 12, left: 4, bottom: 0 }}>
+            <defs>
+              <linearGradient id="fh-proj" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} stroke="var(--border)" />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={axis} minTickGap={32} tickFormatter={formatShortDate} />
+            <YAxis tickLine={false} axisLine={false} tick={axis} width={64} tickFormatter={(v: number) => formatCompactBRL(v)} />
+            <ReferenceLine y={0} stroke="var(--negative)" strokeDasharray="3 3" strokeOpacity={0.6} />
+            <ReferenceDot x={lowest} y={data.conservative.lowest_cents} r={5} fill="var(--warning)" stroke="var(--surface)" strokeWidth={2} />
+            <Tooltip
+              cursor={{ stroke: 'var(--accent)', strokeWidth: 1, strokeDasharray: '4 4' }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null
+                const p = payload[0].payload as (typeof rows)[number]
+                return (
+                  <TipBox
+                    title={formatDate(p.date)}
+                    rows={[
+                      { label: 'Base', value: formatBRL(p.base_cents), color: 'var(--accent)' },
+                      { label: 'Conservador', value: formatBRL(p.conservative_cents), color: 'var(--muted)', dashed: true },
+                    ]}
+                  />
+                )
+              }}
+            />
+            <Area type="stepAfter" dataKey="base_cents" stroke="var(--accent)" strokeWidth={2} fill="url(#fh-proj)"
+              activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--surface)', fill: 'var(--accent)' }} {...ANIM} />
+            <Area type="stepAfter" dataKey="conservative_cents" stroke="var(--muted)" strokeWidth={2} strokeDasharray="5 4"
+              fill="none" activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--surface)' }} {...ANIM} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartFrame>
+  )
 }

@@ -280,3 +280,22 @@ def test_projecao_rejeita_horizonte_invalido(client):
 def test_planejamento_exige_proprietario(anon_client):
     for path in ("/api/v1/budgets", "/api/v1/goals", "/api/v1/projection"):
         assert anon_client.get(path).status_code == 401
+
+
+def test_compras_recentes_trazem_o_cartao(client):
+    acc = _account(client)
+    card = client.post(
+        "/api/v1/cards",
+        json={"name": "Roxinho", "bank": "Nubank", "limit_cents": 500_000, "closing_day": 10, "due_day": 5,
+              "due_month_offset": 1, "purchase_boundary_policy": "EXCLUSIVE", "default_payment_account_id": acc["id"]},
+    ).json()
+    client.post(
+        "/api/v1/cards/purchases",
+        json={"card_id": card["id"], "description": "Assinatura", "merchant": "Netflix", "purchased_on": D,
+              "total_cents": 4_490, "installments_count": 1},
+    )
+    r = client.get("/api/v1/cards/purchases/recent")
+    assert r.status_code == 200, r.text
+    p = r.json()[0]
+    assert p["merchant"] == "Netflix"
+    assert p["card_name"] == "Roxinho" and p["card_bank"] == "Nubank"

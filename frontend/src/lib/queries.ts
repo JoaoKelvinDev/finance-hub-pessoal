@@ -5,6 +5,9 @@ import type {
   Bill,
   BillInstallment,
   AlertList,
+  Budget,
+  Goal,
+  Projection,
   CalendarResponse,
   ExpenseSplit,
   PartyBalanceDetail,
@@ -129,7 +132,7 @@ function useFinanceMutation<TVars, TOut>(fn: (v: TVars) => Promise<TOut>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar', 'parties', 'alerts']) {
+      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar', 'parties', 'alerts', 'budgets', 'goals', 'projection']) {
         void qc.invalidateQueries({ queryKey: [k] })
       }
     },
@@ -517,5 +520,64 @@ export function useUpdateSettings() {
       qc.setQueryData(['settings'], data)
       void qc.invalidateQueries({ queryKey: ['alerts'] })
     },
+  })
+}
+
+// ---------- Planejamento ----------
+
+export function useBudgets() {
+  return useQuery({ queryKey: ['budgets'], queryFn: ({ signal }) => api<Budget[]>('/budgets', { signal }) })
+}
+
+export const useCreateBudget = () =>
+  useFinanceMutation((body: Record<string, unknown>) => api<Budget>('/budgets', { method: 'POST', body }))
+
+export const useUpdateBudget = () =>
+  useFinanceMutation(({ id, ...body }: { id: string } & Record<string, unknown>) =>
+    api<Budget>(`/budgets/${id}`, { method: 'PATCH', body }),
+  )
+
+export const useDeleteBudget = () =>
+  useFinanceMutation((id: string) => api<void>(`/budgets/${id}`, { method: 'DELETE' }))
+
+export const useCopyBudgets = () =>
+  useFinanceMutation((body: { from_month: string; to_month: string }) =>
+    api<{ created: number; skipped: number }>('/budgets/copy', { method: 'POST', body }),
+  )
+
+export function useGoals() {
+  return useQuery({ queryKey: ['goals'], queryFn: ({ signal }) => api<Goal[]>('/goals', { signal }) })
+}
+
+export const useCreateGoal = () =>
+  useFinanceMutation((body: Record<string, unknown>) => api<Goal>('/goals', { method: 'POST', body }))
+
+export const useCancelGoal = () =>
+  useFinanceMutation(({ id, reason }: { id: string; reason: string }) =>
+    api<Goal>(`/goals/${id}/cancel`, { method: 'POST', body: { reason } }),
+  )
+
+export const useAllocateGoal = () =>
+  useFinanceMutation(({ id, withTransfer, ...body }: { id: string; withTransfer: boolean } & Record<string, unknown>) =>
+    api<Goal>(`/goals/${id}/${withTransfer ? 'contributions' : 'allocations'}`, { method: 'POST', body }),
+  )
+
+export const useReverseAllocation = () =>
+  useFinanceMutation(({ goalId, allocationId, reason }: { goalId: string; allocationId: string; reason: string }) =>
+    api<Goal>(`/goals/${goalId}/allocations/${allocationId}/reverse`, { method: 'POST', body: { reason } }),
+  )
+
+export function useProjection(days: 30 | 60 | 90) {
+  return useQuery({
+    queryKey: ['projection', days],
+    queryFn: ({ signal }) => api<Projection>('/projection', { query: { days }, signal }),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useRecentPurchases(limit = 6) {
+  return useQuery({
+    queryKey: ['cards', 'recent-purchases', limit],
+    queryFn: ({ signal }) => api<CardPurchase[]>('/cards/purchases/recent', { query: { limit }, signal }),
   })
 }

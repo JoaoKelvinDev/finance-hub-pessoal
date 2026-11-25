@@ -1,7 +1,7 @@
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MotionConfig } from 'motion/react'
 import { Tooltip } from 'radix-ui'
-import { StrictMode, type ReactNode } from 'react'
+import { lazy, StrictMode, Suspense, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
@@ -23,6 +23,9 @@ import { PersonDetailPage } from '@/pages/person-detail'
 import { SettingsPage } from '@/pages/settings'
 import { TransactionsPage } from '@/pages/transactions'
 import './index.css'
+
+// Planejamento (orçamentos/metas/projeção) carrega sob demanda.
+const PlanningPage = lazy(() => import('@/pages/planning').then((m) => ({ default: m.PlanningPage })))
 
 const queryClient: QueryClient = new QueryClient({
   // Qualquer mutação bem-sucedida pode alterar vencimentos: o calendário é sempre revalidado.
@@ -67,6 +70,15 @@ const router = createBrowserRouter([
       { path: '/pessoas', element: <PeoplePage /> },
       { path: '/pessoas/:id', element: <PersonDetailPage /> },
       { path: '/terceiros', element: <PartiesPage /> },
+      {
+        path: '/planejamento',
+        element: (
+          <Suspense fallback={<div className="shimmer h-96 rounded-2xl" />}>
+            <PlanningPage />
+          </Suspense>
+        ),
+      },
+      { path: '/em-breve/planejamento', element: <Navigate to="/planejamento" replace /> },
       { path: '/em-breve/terceiros', element: <Navigate to="/terceiros" replace /> },
       { path: '/configuracoes', element: <SettingsPage /> },
       { path: '/em-breve/:mod', element: <ComingSoonPage /> },

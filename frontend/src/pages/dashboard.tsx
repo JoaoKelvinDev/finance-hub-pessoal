@@ -15,11 +15,13 @@ import {
   Receipt,
   Repeat,
   Scale,
+  Target,
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
 import { lazy, Suspense, useMemo, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { BrandAvatar } from '@/components/finance/brand-avatar'
 import { CurrencyDisplay } from '@/components/finance/currency'
 import { PeriodPicker, usePeriod } from '@/components/finance/period-picker'
 import { EmptyState, ErrorState } from '@/components/finance/states'
@@ -32,7 +34,7 @@ import { useTransactionActions } from '@/features/transactions/actions'
 import { addDays, daysBetween, formatDate, formatMonth, formatShortDate } from '@/lib/date'
 import { formatBRL, formatPct } from '@/lib/money'
 import { riseItem, staggerContainer } from '@/lib/motion'
-import { useCalendar, useDashboard } from '@/lib/queries'
+import { useCalendar, useDashboard, useGoals, useRecentPurchases } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { CalendarEvent, CalendarSource, Dashboard, Kpi } from '@/types/api'
 
@@ -136,6 +138,10 @@ export function DashboardPage() {
                 <UpcomingPayments today={data.today} dueSoon={data.kpis.due_soon} overdue={data.kpis.overdue} />
               </motion.div>
             </div>
+
+            <motion.div variants={riseItem}>
+              <RecentCardPurchases />
+            </motion.div>
           </div>
 
           {/* Coluna lateral */}
@@ -149,6 +155,9 @@ export function DashboardPage() {
                   <CategoryChart data={data.expenses_by_category} />
                 </ChartSlot>
               </Card>
+            </motion.div>
+            <motion.div variants={riseItem}>
+              <GoalsCard />
             </motion.div>
             <motion.div variants={riseItem}>
               <PartiesCard receivables={data.kpis.receivables} payables={data.kpis.payables} />
@@ -510,5 +519,92 @@ function DashboardSkeleton() {
         <Skeleton className="h-96 rounded-2xl" />
       </div>
     </div>
+  )
+}
+
+// ---------- Metas (resumo) ----------
+
+function GoalsCard() {
+  const q = useGoals()
+  const goals = (q.data ?? []).filter((g) => g.state !== 'CANCELLED').slice(0, 3)
+  return (
+    <Card>
+      <SectionHeader title="Metas" to="/planejamento" />
+      {q.isPending ? (
+        <div className="px-5 pb-5">
+          <Skeleton className="h-16" />
+        </div>
+      ) : goals.length === 0 ? (
+        <div className="flex items-center gap-3 px-5 pb-5 text-sm text-muted">
+          <Target className="size-4 shrink-0" aria-hidden />
+          <span>
+            Nenhuma meta.{' '}
+            <Link to="/planejamento" className="font-medium text-accent hover:underline">
+              Criar a primeira
+            </Link>
+          </span>
+        </div>
+      ) : (
+        <ul className="space-y-4 px-5 pb-5">
+          {goals.map((g) => (
+            <li key={g.id}>
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="truncate text-sm">{g.title}</p>
+                <span className="shrink-0 text-xs text-muted tabular-nums">{g.progress_pct.toLocaleString('pt-BR')}%</span>
+              </div>
+              <p className="text-xs text-muted">
+                {formatBRL(g.allocated_cents)} de {formatBRL(g.target_cents)}
+              </p>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+                <div
+                  className={cn(
+                    'h-full rounded-full',
+                    g.state === 'ACHIEVED' ? 'bg-positive' : 'bg-gradient-to-r from-violet-500 to-fuchsia-500',
+                  )}
+                  style={{ width: `${Math.min(100, g.progress_pct)}%` }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+// ---------- Compras recentes no cartão (marca + selo do cartão) ----------
+
+function RecentCardPurchases() {
+  const q = useRecentPurchases(6)
+  const items = q.data ?? []
+  if (!q.isPending && items.length === 0) return null
+  return (
+    <Card className="overflow-hidden">
+      <SectionHeader title="Compras recentes no cartão" to="/cartoes" label="Cartões" />
+      {q.isPending ? (
+        <ListSkeleton rows={3} />
+      ) : (
+        <ul className="grid divide-y divide-border border-t border-border sm:grid-cols-2 sm:divide-y-0">
+          {items.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 px-5 py-3 sm:border-b sm:border-border sm:odd:border-r">
+              <BrandAvatar
+                name={p.description}
+                merchant={p.merchant}
+                fallbackColor={p.category_color}
+                card={p.card_name ? { name: p.card_name, bank: p.card_bank, color: p.card_color } : null}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm">{p.merchant || p.description}</p>
+                <p className="truncate text-xs text-muted">
+                  {p.card_name ?? 'Cartão'} · {formatShortDate(p.purchased_on)}
+                  {p.installments_count > 1 && ` · ${p.installments_count}x`}
+                </p>
+              </div>
+              <span className="num shrink-0 text-sm font-medium">{formatBRL(p.total_cents)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }

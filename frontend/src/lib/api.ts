@@ -43,7 +43,7 @@ export async function api<T>(
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   })
 
-  if (res.ok) return (await res.json()) as T
+  if (res.ok) return (res.status === 204 ? undefined : await res.json()) as T
 
   let body: ApiErrorBody | null = null
   try {

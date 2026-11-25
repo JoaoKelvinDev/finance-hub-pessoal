@@ -48,9 +48,13 @@ Empréstimos, adiantamentos, acertos parciais, tela por pessoa.
 ## Etapa 5 — Inteligência e acabamento
 Orçamentos, metas, projeção 30/60/90, relatórios, exportações, backup/restore.
 
-- [ ] Orçamentos por categoria e período (base caixa × competência), avisos em 80% e 100%
-- [ ] Metas e reservas (`goals`, `goal_allocations`): aporte entre contas próprias não é despesa
-- [ ] Projeção de fluxo de caixa em 30/60/90 dias (parcela de cartão e pagamento da fatura não contam como duas saídas)
+- [x] Orçamentos por categoria (inclui subcategorias) e período, base caixa × competência; realizado,
+      comprometido e avisos em 80% / 100% (também na central de alertas); copiar para o próximo mês
+- [x] Metas e reservas (`goals`, `goal_allocations`): aporte registrado ou transferência entre contas próprias
+      (nunca despesa), estorno de aporte
+- [x] Projeção diária 30/60/90 (`GET /projection`), cenários conservador e base; cartão só pela fatura
+- [x] Tela `/planejamento` (Orçamentos, Metas, Projeção) e cartão de metas no dashboard
+- [x] Ícones de marca locais (`simple-icons`, sem serviço externo) com selo do cartão nas compras
 - [ ] Relatórios: por categoria, período, cartão e pessoa; aging de recebíveis (0–30 / 31–60 / 61–90 / 90+)
 - [ ] Exportação CSV (UTF-8) e XLSX/PDF progressivas
 - [ ] Performance das consultas, observabilidade e backup/restore testado

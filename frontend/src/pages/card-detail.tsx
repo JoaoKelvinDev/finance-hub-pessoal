@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useCard, useCardStatements, useCardPurchases, useUpcomingInstallments } from '@/lib/queries'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, Skeleton } from '@/components/ui/card'
+import { BrandAvatar } from '@/components/finance/brand-avatar'
 import { EmptyState } from '@/components/finance/states'
 import { CurrencyDisplay, CardUtilization } from '@/components/finance/card-utilization'
 import { UpcomingInstallments } from '@/components/finance/installment-timeline'
@@ -158,7 +159,7 @@ export function CardDetailPage() {
           ) : (
             <div className="space-y-2">
               {purchases?.map((purchase) => (
-                <PurchaseCard key={purchase.id} purchase={purchase} />
+                <PurchaseCard key={purchase.id} purchase={purchase} card={card} />
               ))}
             </div>
           )}
@@ -280,15 +281,18 @@ interface PurchaseCardProps {
   }
 }
 
-function PurchaseCard({ purchase }: PurchaseCardProps) {
+function PurchaseCard({ purchase, card }: PurchaseCardProps & { card?: { name: string; bank: string | null; color: string } }) {
   return (
     <Card className="group hover:border-border hover:bg-surface-2/50 transition-colors">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0 flex items-center gap-3">
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent" aria-hidden>
-              <CreditCard className="size-5" />
-            </div>
+            <BrandAvatar
+              name={purchase.description}
+              merchant={purchase.merchant}
+              fallbackColor={purchase.category_color}
+              card={card ? { name: card.name, bank: card.bank, color: card.color } : null}
+            />
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium text-fg truncate">{purchase.description}</p>

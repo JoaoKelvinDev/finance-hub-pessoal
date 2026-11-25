@@ -59,6 +59,9 @@ export interface CardStatement {
 export interface CardPurchase {
   id: string
   card_id: string
+  card_name?: string | null
+  card_bank?: string | null
+  card_color?: string | null
   description: string
   merchant: string | null
   purchased_on: string
@@ -443,6 +446,71 @@ export interface AppAlert {
 export interface AlertList {
   items: AppAlert[]
   counts: { total: number; danger: number; warning: number; info: number }
+}
+
+// ---------- Planejamento ----------
+
+export type BudgetBasis = 'CASH' | 'COMPETENCE'
+export type BudgetStatus = 'OK' | 'WARNING' | 'OVER'
+
+export interface Budget {
+  id: string
+  category_id: string | null
+  category_name: string | null
+  period_start: string
+  period_end: string
+  limit_cents: number
+  basis: BudgetBasis
+  notes: string | null
+  spent_cents: number
+  committed_cents: number
+  used_cents: number
+  remaining_cents: number
+  progress_pct: number
+  status: BudgetStatus
+  formula: string
+}
+
+export interface GoalAllocation {
+  id: string
+  amount_cents: number
+  allocated_on: string
+  transfer_reference: string | null
+  transfer_group_id: string | null
+  notes: string | null
+  reversed_at: string | null
+  reverse_reason: string | null
+  created_at: string
+}
+
+export interface Goal {
+  id: string
+  title: string
+  target_cents: number
+  target_date: string | null
+  state: 'ACTIVE' | 'ACHIEVED' | 'CANCELLED'
+  notes: string | null
+  allocated_cents: number
+  remaining_cents: number
+  progress_pct: number
+  allocations: GoalAllocation[]
+}
+
+export interface ProjectionSummary {
+  end_cents: number
+  lowest_cents: number
+  lowest_date: string
+  inflow_cents: number
+  outflow_cents: number
+}
+
+export interface Projection {
+  today: string
+  days: number
+  start_balance_cents: number
+  conservative: ProjectionSummary
+  base: ProjectionSummary
+  points: { date: string; conservative_cents: number; base_cents: number }[]
 }
 
 export interface ApiErrorBody {
