@@ -77,9 +77,9 @@ export const useQuickAdd = () => useContext(QuickAdd)
 
 function readCollapsed() {
   try {
-    return localStorage.getItem('fh-sidebar') === '1'
+    return localStorage.getItem('fh-sidebar') !== '0'
   } catch {
-    return false
+    return true
   }
 }
 
@@ -125,10 +125,10 @@ export function AppLayout() {
           initial={false}
           animate={{ width: collapsed ? 72 : 248 }}
           transition={spring}
-          className="sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-surface md:flex"
+          className="sticky top-3 my-3 ml-3 hidden h-[calc(100dvh-1.5rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-card md:flex"
         >
           <div className="flex h-16 items-center gap-2.5 px-4">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-fg text-bg">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-400 to-violet-700 text-white shadow-[0_6px_18px_-6px_rgb(139_92_246/0.7)]">
               <Wallet className="size-[18px]" aria-hidden />
             </span>
             <AnimatePresence initial={false}>
@@ -178,7 +178,7 @@ export function AppLayout() {
         </motion.aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur-md sm:px-6">
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-3 bg-bg/70 px-4 backdrop-blur-md sm:px-6">
             <AnimatePresence mode="wait" initial={false}>
               <motion.h1
                 key={title}
@@ -233,11 +233,13 @@ function SideLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
       {({ isActive }) => (
         <>
           {isActive && (
-            <motion.span layoutId="sidebar-active" transition={spring} className="absolute inset-0 rounded-lg bg-surface-2">
-              <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-accent" />
-            </motion.span>
+            <motion.span
+              layoutId="sidebar-active"
+              transition={spring}
+              className="absolute inset-0 rounded-lg bg-accent-soft ring-1 ring-accent/25"
+            />
           )}
-          <Icon className="relative size-4 shrink-0" aria-hidden />
+          <Icon className={cn('relative size-4 shrink-0', isActive && 'text-accent')} aria-hidden />
           {!collapsed && <span className="relative flex-1 truncate">{item.label}</span>}
           {!collapsed && item.stage && (
             <span className="relative rounded-md bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted">
@@ -249,7 +251,15 @@ function SideLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
       )}
     </NavLink>
   )
-  return collapsed ? <Tooltip content={item.label + (item.stage ? ` (Etapa ${item.stage})` : '')}>{link}</Tooltip> : link
+  // O Trigger do tooltip (asChild) concatena className como texto; como o NavLink usa uma função
+  // de classes, ele as perderia (inclusive o `relative`). O span recebe as props do Trigger no lugar.
+  return collapsed ? (
+    <Tooltip content={item.label + (item.stage ? ` (Etapa ${item.stage})` : '')}>
+      <span className="block">{link}</span>
+    </Tooltip>
+  ) : (
+    link
+  )
 }
 
 function MobileNav({ onNew }: { onNew: () => void }) {

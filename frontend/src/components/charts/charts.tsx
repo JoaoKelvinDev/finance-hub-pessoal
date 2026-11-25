@@ -91,7 +91,7 @@ export function ChartFrame({
 
 function TipBox({ title, rows }: { title: string; rows: { label: string; value: string; color?: string; dashed?: boolean }[] }) {
   return (
-    <div className="min-w-44 rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-pop">
+    <div className="min-w-44 rounded-xl border border-border bg-surface/95 px-3 py-2.5 text-xs shadow-pop backdrop-blur">
       <p className="mb-1.5 font-medium text-fg">{title}</p>
       {rows.map((r) => (
         <div key={r.label} className="flex items-center justify-between gap-4 py-0.5">
@@ -248,12 +248,12 @@ export function BalanceChart({ data, today }: { data: Dashboard['balance_series'
       }
     >
       {data.length ? (
-        <div className="h-60">
+        <div className="h-72">
           <ResponsiveContainer>
             <AreaChart data={rows} margin={{ top: 12, right: 12, left: 4, bottom: 0 }}>
               <defs>
                 <linearGradient id="fh-balance" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.18} />
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.4} />
                   <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -268,7 +268,7 @@ export function BalanceChart({ data, today }: { data: Dashboard['balance_series'
               />
               <YAxis tickLine={false} axisLine={false} tick={axis} width={64} tickFormatter={(v: number) => formatCompactBRL(v)} />
               <Tooltip
-                cursor={{ stroke: 'var(--muted)', strokeWidth: 1, strokeDasharray: '3 3' }}
+                cursor={{ stroke: 'var(--accent)', strokeWidth: 1, strokeDasharray: '4 4' }}
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null
                   const p = payload[0].payload as (typeof rows)[number]
@@ -295,7 +295,7 @@ export function BalanceChart({ data, today }: { data: Dashboard['balance_series'
                 strokeWidth={2}
                 fill="url(#fh-balance)"
                 connectNulls={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--surface)' }}
+                activeDot={{ r: 6, strokeWidth: 3, stroke: 'var(--surface)', fill: 'var(--accent)' }}
                 {...ANIM}
               />
               {hasProjection && (
@@ -307,7 +307,7 @@ export function BalanceChart({ data, today }: { data: Dashboard['balance_series'
                   strokeDasharray="5 4"
                   fill="none"
                   connectNulls={false}
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--surface)' }}
+                  activeDot={{ r: 6, strokeWidth: 3, stroke: 'var(--surface)', fill: 'var(--accent)' }}
                   {...ANIM}
                 />
               )}
@@ -379,7 +379,7 @@ export function CategoryChart({ data }: { data: Dashboard['expenses_by_category'
       }
     >
       {data.length ? (
-        <div className="grid items-center gap-2 px-3 sm:grid-cols-[180px_1fr]">
+        <div className="@container"><div className="grid items-center gap-3 px-3 @lg:grid-cols-[180px_1fr]">
           <div className="relative mx-auto size-44">
             <ResponsiveContainer>
               <PieChart>
@@ -418,11 +418,58 @@ export function CategoryChart({ data }: { data: Dashboard['expenses_by_category'
             </div>
           </div>
           {ranking}
-        </div>
+        </div></div>
       ) : (
         <ChartEmpty text="Nenhuma despesa efetivada no período." />
       )}
     </ChartFrame>
+  )
+}
+
+// ---------- Minigráfico dos KPIs ----------
+export interface SparkPoint {
+  label: string
+  value: number
+}
+
+/** Linha fina de tendência para os cartões de KPI (sem eixos; tooltip com o valor do ponto). */
+export function Sparkline({ points, tone, id }: { points: SparkPoint[]; tone: 'positive' | 'negative' | 'accent'; id: string }) {
+  if (points.length < 2) return <div className="h-12" aria-hidden />
+  const color = `var(--${tone})`
+  return (
+    <div className="h-12" role="img" aria-label={`Tendência: de ${formatBRL(points[0].value)} a ${formatBRL(points[points.length - 1].value)}`}>
+      <ResponsiveContainer>
+        <AreaChart data={points} margin={{ top: 4, right: 2, left: 2, bottom: 2 }}>
+          <defs>
+            <linearGradient id={`spark-${id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <YAxis hide domain={['dataMin', 'dataMax']} />
+          <Tooltip
+            cursor={{ stroke: 'var(--muted)', strokeWidth: 1, strokeDasharray: '2 3' }}
+            content={({ active, payload }) =>
+              active && payload?.length ? (
+                <div className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] shadow-pop">
+                  <span className="text-muted">{(payload[0].payload as SparkPoint).label}: </span>
+                  <span className="num font-medium">{formatBRL((payload[0].payload as SparkPoint).value)}</span>
+                </div>
+              ) : null
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            strokeWidth={2}
+            fill={`url(#spark-${id})`}
+            activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--surface)' }}
+            {...ANIM}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
