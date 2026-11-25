@@ -48,13 +48,13 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { to: '/contas-da-casa', label: 'Contas da casa', icon: Receipt },
       { to: '/calendario', label: 'Calendário', icon: CalendarDays },
       { to: '/terceiros', label: 'Valores com terceiros', icon: HandCoins },
+      { to: '/planejamento', label: 'Planejamento', icon: Target },
       { to: '/pessoas', label: 'Pessoas', icon: Users },
     ],
   },
   {
     section: 'Próximas etapas',
     items: [
-      { to: '/em-breve/planejamento', label: 'Planejamento', icon: Target, stage: 5 },
       { to: '/em-breve/relatorios', label: 'Relatórios', icon: ChartPie, stage: 5 },
     ],
   },
@@ -68,6 +68,7 @@ const TITLES: Record<string, string> = {
   '/contas-da-casa': 'Contas da casa',
   '/calendario': 'Calendário financeiro',
   '/terceiros': 'Valores com terceiros',
+  '/planejamento': 'Planejamento',
   '/pessoas': 'Pessoas',
   '/configuracoes': 'Configurações',
 }

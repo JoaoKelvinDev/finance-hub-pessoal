@@ -4,7 +4,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, StringConstraints
 
-AlertKind = Literal["DUE_SOON", "DUE_TODAY", "OVERDUE", "RECEIVABLE_OVERDUE", "CARD_UTILIZATION", "ESTIMATE_PENDING"]
+AlertKind = Literal[
+    "DUE_SOON", "DUE_TODAY", "OVERDUE", "RECEIVABLE_OVERDUE", "CARD_UTILIZATION", "ESTIMATE_PENDING", "BUDGET"
+]
 AlertSeverity = Literal["info", "warning", "danger"]
 
 

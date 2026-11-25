@@ -543,3 +543,84 @@ class AlertDismissal(Base):
 
     key: Mapped[str] = mapped_column(String(200), primary_key=True)
     dismissed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---------- Etapa 5 — Planejamento: orçamentos e metas ----------
+
+BUDGET_BASES = ("CASH", "COMPETENCE")
+GOAL_STATES = ("ACTIVE", "ACHIEVED", "CANCELLED")
+
+
+class Budget(Base, UUIDPk, Timestamps):
+    """Orçamento por categoria e período.
+
+    `category_id` nulo = orçamento geral (todas as categorias de despesa).
+    `basis` define o que conta como consumo: caixa (pago no período) ou
+    competência (consumo atribuído ao período).
+    """
+
+    __tablename__ = "budgets"
+    __table_args__ = (
+        CheckConstraint(_in("basis", BUDGET_BASES), name="basis_valid"),
+        CheckConstraint("limit_cents > 0", name="limit_positive"),
+        CheckConstraint("period_end >= period_start", name="period_valid"),
+        UniqueConstraint(
+            "category_id", "period_start", "period_end", name="uq_budget_period", postgresql_nulls_not_distinct=True
+        ),
+        Index("ix_budgets_period", "period_start", "period_end"),
+    )
+
+    category_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"))
+    period_start: Mapped[date] = mapped_column(Date)
+    period_end: Mapped[date] = mapped_column(Date)
+    limit_cents: Mapped[int] = mapped_column(BigInteger)
+    basis: Mapped[str] = mapped_column(String(12), default="CASH")
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    category: Mapped[Category | None] = relationship(lazy="joined")
+
+
+class Goal(Base, UUIDPk, Timestamps):
+    """Meta ou reserva (emergência, viagem etc.). Aportes são rastreados e não viram gasto."""
+
+    __tablename__ = "goals"
+    __table_args__ = (
+        CheckConstraint("target_cents > 0", name="target_positive"),
+        CheckConstraint(_in("state", GOAL_STATES), name="state_valid"),
+        CheckConstraint("state != 'CANCELLED' OR cancelled_at IS NOT NULL", name="cancelled_consistent"),
+    )
+
+    title: Mapped[str] = mapped_column(String(80))
+    target_cents: Mapped[int] = mapped_column(BigInteger)
+    target_date: Mapped[date | None] = mapped_column(Date)
+    state: Mapped[str] = mapped_column(String(12), default="ACTIVE")
+    notes: Mapped[str | None] = mapped_column(Text)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancel_reason: Mapped[str | None] = mapped_column(String(200))
+
+    allocations: Mapped[list["GoalAllocation"]] = relationship(
+        lazy="selectin", order_by="GoalAllocation.allocated_on", back_populates="goal"
+    )
+
+
+class GoalAllocation(Base, UUIDPk, Timestamps):
+    """Aporte na meta. Não é receita nem despesa: sai de uma conta para outra."""
+
+    __tablename__ = "goal_allocations"
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="amount_positive"),
+        Index("ix_goal_allocations_goal", "goal_id"),
+    )
+
+    goal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("goals.id", ondelete="CASCADE"))
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    allocated_on: Mapped[date] = mapped_column(Date)
+    # Referência opcional da transferência interna que originou o aporte.
+    transfer_reference: Mapped[str | None] = mapped_column(String(120))
+    # Transferência real entre contas próprias (aporte com caixa); estornada junto com o aporte.
+    transfer_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reverse_reason: Mapped[str | None] = mapped_column(String(200))
+
+    goal: Mapped[Goal] = relationship(back_populates="allocations")

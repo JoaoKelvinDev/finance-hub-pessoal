@@ -310,6 +310,10 @@ class PurchaseCreate(BaseModel):
 class PurchaseOut(ORM):
     id: uuid.UUID
     card_id: uuid.UUID
+    # Dados do cartão para exibir o selo (ex.: Netflix no Nubank).
+    card_name: str | None = None
+    card_bank: str | None = None
+    card_color: str | None = None
     purchased_on: date
     description: str
     merchant: str | None
@@ -331,6 +335,9 @@ class PurchaseOut(ORM):
         return cls(
             id=p.id,
             card_id=p.card_id,
+            card_name=(p.card.nickname or p.card.name) if p.card else None,
+            card_bank=p.card.bank if p.card else None,
+            card_color=p.card.color if p.card else None,
             purchased_on=p.purchased_on,
             description=p.description,
             merchant=p.merchant,

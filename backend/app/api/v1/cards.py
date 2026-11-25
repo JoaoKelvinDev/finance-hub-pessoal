@@ -69,6 +69,18 @@ def update_card(card_id: uuid.UUID, data: CardUpdate, db: DB, rid: RequestId):
     return _card_out(card, used, available)
 
 
+@router.get("/purchases/recent", response_model=list[PurchaseOut])
+def recent_purchases(db: DB, limit: int = Query(8, ge=1, le=50)):
+    """Compras mais recentes de todos os cartões (com o cartão usado)."""
+    rows = db.scalars(
+        select(CardPurchase)
+        .where(CardPurchase.status == "ACTIVE")
+        .order_by(CardPurchase.purchased_on.desc(), CardPurchase.created_at.desc())
+        .limit(limit)
+    ).unique()
+    return [PurchaseOut.from_model(p) for p in rows]
+
+
 @router.get("/{card_id}", response_model=CardOut)
 def get_card(card_id: uuid.UUID, db: DB):
     card, used, available = service.get_card_with_limits(db, card_id)
