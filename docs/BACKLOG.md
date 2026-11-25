@@ -18,6 +18,12 @@ Cadastro de cartão, `resolve_statement_for_purchase`, ciclos materializados, co
 ## Etapa 3 — Contas da casa e recorrências
 Obrigações, recorrências idempotentes, estimado × real, calendário, alertas in-app, rateios.
 
+- [x] Contas, recorrências e parcelas (pagar/estornar/pular/cancelar, idempotência, auditoria)
+- [x] Calendário financeiro: `GET /calendar?from=&to=` (máx. 92 dias) unificando faturas, parcelas de contas,
+      previsões virtuais de recorrências (descartadas quando já há parcela com mesmo `recurrence_id`+`due_date`)
+      e lançamentos `PLANNED`; pagamentos não viram eventos próprios. Página `/calendario` com Mês, Semana e Agenda.
+- [ ] Estimado × real em contas variáveis, alertas in-app, rateios com contatos
+
 ## Etapa 4 — Valores com terceiros
 Empréstimos, adiantamentos, acertos parciais, tela por pessoa.
 

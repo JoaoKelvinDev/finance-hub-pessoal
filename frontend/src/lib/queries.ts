@@ -4,6 +4,7 @@ import type {
   Account,
   Bill,
   BillInstallment,
+  CalendarResponse,
   BillInstallmentPage,
   CardInstallment,
   CardPurchase,
@@ -41,6 +42,15 @@ export const keys = {
   billInstallment: (id: string) => ['bills', 'installments', id] as const,
   upcomingInstallments: (days: number) => ['bills', 'installments', 'upcoming', days] as const,
   overdueInstallments: (limit: number) => ['bills', 'installments', 'overdue', limit] as const,
+  calendar: (from: string, to: string) => ['calendar', from, to] as const,
+}
+
+export function useCalendar(from: string, to: string) {
+  return useQuery({
+    queryKey: keys.calendar(from, to),
+    queryFn: ({ signal }) => api<CalendarResponse>('/calendar', { query: { from, to }, signal }),
+    placeholderData: keepPreviousData,
+  })
 }
 
 export function useDashboard(from: string, to: string) {
@@ -109,7 +119,7 @@ function useFinanceMutation<TVars, TOut>(fn: (v: TVars) => Promise<TOut>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions']) {
+      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar']) {
         void qc.invalidateQueries({ queryKey: [k] })
       }
     },
@@ -346,8 +356,15 @@ export const useUpdateBillInstallment = () =>
 
 export const usePayBillInstallment = () =>
   useFinanceMutation(
-    ({ installmentId, ...body }: { installmentId: string } & Record<string, unknown>) =>
-      api<BillInstallment>(`/bills/installments/${installmentId}/pay`, { method: 'POST', body }),
+    // O endpoint recebe os dados de pagamento como query string.
+    ({ installmentId, ...query }: {
+      installmentId: string
+      account_id: string
+      paid_on: string
+      amount_cents?: number
+      idempotency_key?: string
+    }) =>
+      api<BillInstallment>(`/bills/installments/${installmentId}/pay`, { method: 'POST', query }),
   )
 
 export const useReverseBillInstallment = () =>

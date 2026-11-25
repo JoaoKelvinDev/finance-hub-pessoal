@@ -44,13 +44,13 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { to: '/contas', label: 'Contas e carteiras', icon: Wallet },
       { to: '/cartoes', label: 'Cartões', icon: CreditCard },
       { to: '/contas-da-casa', label: 'Contas da casa', icon: Receipt },
+      { to: '/calendario', label: 'Calendário', icon: CalendarDays },
       { to: '/pessoas', label: 'Pessoas', icon: Users },
     ],
   },
   {
     section: 'Próximas etapas',
     items: [
-      { to: '/em-breve/calendario', label: 'Calendário', icon: CalendarDays, stage: 3 },
       { to: '/em-breve/terceiros', label: 'Valores com terceiros', icon: Users, stage: 4 },
       { to: '/em-breve/planejamento', label: 'Planejamento', icon: Target, stage: 5 },
       { to: '/em-breve/relatorios', label: 'Relatórios', icon: ChartPie, stage: 5 },
@@ -64,6 +64,7 @@ const TITLES: Record<string, string> = {
   '/contas': 'Contas e carteiras',
   '/cartoes': 'Cartões',
   '/contas-da-casa': 'Contas da casa',
+  '/calendario': 'Calendário financeiro',
   '/pessoas': 'Pessoas',
   '/configuracoes': 'Configurações',
 }
@@ -245,13 +246,14 @@ function MobileNav({ onNew }: { onNew: () => void }) {
   const items: NavItem[] = [
     { to: '/', label: 'Início', icon: LayoutDashboard },
     { to: '/lancamentos', label: 'Lançamentos', icon: ArrowLeftRight },
+    { to: '/calendario', label: 'Agenda', icon: CalendarDays },
     { to: '/contas', label: 'Contas', icon: Wallet },
     { to: '/cartoes', label: 'Cartões', icon: CreditCard },
-    { to: '/contas-da-casa', label: 'Contas da casa', icon: Receipt },
+    { to: '/contas-da-casa', label: 'Casa', icon: Receipt },
     { to: '/configuracoes', label: 'Ajustes', icon: Settings },
   ]
-  const left = items.slice(0, 2)
-  const right = items.slice(2)
+  const left = items.slice(0, 3)
+  const right = items.slice(3)
   const renderItem = (item: NavItem) => (
     <NavLink
       key={item.to}

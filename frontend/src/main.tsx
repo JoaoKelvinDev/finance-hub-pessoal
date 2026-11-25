@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MotionConfig } from 'motion/react'
 import { Tooltip } from 'radix-ui'
 import { StrictMode, type ReactNode } from 'react'
@@ -11,6 +11,7 @@ import { ThemeProvider, useTheme } from '@/app/theme'
 import { ApiError } from '@/lib/api'
 import { AccountDetailPage, AccountsPage } from '@/pages/accounts'
 import { BillsPage } from '@/pages/bills'
+import { CalendarPage } from '@/pages/calendar'
 import { CardsPage } from '@/pages/cards'
 import { CardDetailPage } from '@/pages/card-detail'
 import { ComingSoonPage } from '@/pages/coming-soon'
@@ -21,7 +22,11 @@ import { SettingsPage } from '@/pages/settings'
 import { TransactionsPage } from '@/pages/transactions'
 import './index.css'
 
-const queryClient = new QueryClient({
+const queryClient: QueryClient = new QueryClient({
+  // Qualquer mutação bem-sucedida pode alterar vencimentos: o calendário é sempre revalidado.
+  mutationCache: new MutationCache({
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['calendar'] }),
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,
@@ -55,6 +60,8 @@ const router = createBrowserRouter([
       { path: '/cartoes', element: <CardsPage /> },
       { path: '/cartoes/:id', element: <CardDetailPage /> },
       { path: '/contas-da-casa', element: <BillsPage /> },
+      { path: '/calendario', element: <CalendarPage /> },
+      { path: '/em-breve/calendario', element: <Navigate to="/calendario" replace /> },
       { path: '/pessoas', element: <PeoplePage /> },
       { path: '/configuracoes', element: <SettingsPage /> },
       { path: '/em-breve/:mod', element: <ComingSoonPage /> },

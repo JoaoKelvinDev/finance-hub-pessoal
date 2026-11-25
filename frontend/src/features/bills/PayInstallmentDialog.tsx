@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { useAccounts } from '@/lib/queries'
+import { toast } from 'sonner'
+import { useAccounts, usePayBillInstallment } from '@/lib/queries'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/field'
 import { CurrencyDisplay, CurrencyInput } from '@/components/finance/currency'
-import { formatDate } from '@/lib/date'
+import { formatDate, todayISO } from '@/lib/date'
 import { formatBRL } from '@/lib/money'
 import type { BillInstallment, Account } from '@/types/api'
 
@@ -20,45 +19,49 @@ interface PayInstallmentDialogProps {
 export function PayInstallmentDialog({ open, onOpenChange, installment, onSuccess }: PayInstallmentDialogProps) {
   const [form, setForm] = useState({
     account_id: '',
-    paid_on: new Date().toISOString().split('T')[0],
+    paid_on: todayISO(),
     amount_cents: '',
     idempotency_key: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const accounts = useAccounts()
-
-  const mutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      api<BillInstallment>(`/bills/installments/${installment!.id}/pay`, {
-        method: 'POST',
-        body,
-      }),
-    onSuccess: () => {
-      onOpenChange(false)
-      onSuccess?.()
-    },
-    onError: (err: Error & { code?: string; details?: unknown }) => {
-      if (err.code === 'validation_error' && err.details) {
-        setErrors(err.details as Record<string, string>)
-      }
-    },
-  })
+  const mutation = usePayBillInstallment()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setErrors({})
-
-    const payload: Record<string, unknown> = {
-      account_id: form.account_id,
-      paid_on: form.paid_on,
-      amount_cents: parseInt(form.amount_cents.replace(/\D/g, ''), 10),
+    if (!form.account_id) {
+      setErrors({ account_id: 'Selecione a conta de pagamento.' })
+      return
     }
 
-    if (form.idempotency_key) {
-      payload.idempotency_key = form.idempotency_key
-    }
-
-    mutation.mutate(payload)
+    const typed = parseInt(form.amount_cents.replace(/\D/g, ''), 10)
+    mutation.mutate(
+      {
+        installmentId: installment!.id,
+        account_id: form.account_id,
+        paid_on: form.paid_on,
+        // Campo vazio = valor da parcela (padrão do backend).
+        ...(Number.isFinite(typed) && typed > 0 ? { amount_cents: typed } : {}),
+        ...(form.idempotency_key ? { idempotency_key: form.idempotency_key } : {}),
+      },
+      {
+        onSuccess: () => {
+          toast.success('Pagamento registrado.')
+          onOpenChange(false)
+          onSuccess?.()
+        },
+        onError: (err: Error & { code?: string; details?: unknown }) => {
+          if (err.code === 'validation_error' && Array.isArray(err.details)) {
+            setErrors(
+              Object.fromEntries((err.details as { field: string; message: string }[]).map((d) => [d.field, d.message])),
+            )
+          } else {
+            toast.error(err.message || 'Não foi possível registrar o pagamento.')
+          }
+        },
+      },
+    )
   }
 
   if (!installment) return null

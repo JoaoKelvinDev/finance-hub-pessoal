@@ -239,6 +239,50 @@ export interface Dashboard {
   health: { savings_rate_pct: number | null; overdue_count: number; overdue_cents: number }
 }
 
+// ---------- Calendário ----------
+
+export type CalendarSource = 'CARD_STATEMENT' | 'BILL_INSTALLMENT' | 'RECURRENCE_FORECAST' | 'PLANNED_TRANSACTION'
+export type CalendarStatus = 'PENDING' | 'OVERDUE' | 'PARTIAL' | 'PAID' | 'FORECAST' | 'SKIPPED' | 'REVERSED'
+
+export interface CalendarEvent {
+  key: string
+  source: CalendarSource
+  source_id: string
+  /** Cartão (fatura), conta da casa (parcela/previsão) ou conta financeira (lançamento). */
+  ref_id: string
+  date: string
+  title: string
+  subtitle: string | null
+  direction: 'IN' | 'OUT'
+  amount_cents: number
+  open_cents: number
+  status: CalendarStatus
+  color: string
+}
+
+export interface CalendarDay {
+  date: string
+  out_cents: number
+  in_cents: number
+  count: number
+}
+
+export interface CalendarResponse {
+  date_from: string
+  date_to: string
+  today: string
+  summary: {
+    to_pay_cents: number
+    to_receive_cents: number
+    paid_cents: number
+    overdue_cents: number
+    overdue_count: number
+    event_count: number
+  }
+  days: CalendarDay[]
+  events: CalendarEvent[]
+}
+
 export interface ApiErrorBody {
   error: { code: string; message: string; details: unknown; request_id: string | null }
 }
