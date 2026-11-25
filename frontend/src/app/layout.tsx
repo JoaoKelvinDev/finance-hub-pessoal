@@ -26,6 +26,7 @@ import { useAuth } from '@/app/auth'
 import { useTheme, type ThemePref } from '@/app/theme'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/misc'
+import { AlertsBell } from '@/features/alerts/AlertsBell'
 import { NewTransactionDialog, type NewKind } from '@/features/transactions/new-transaction-dialog'
 import { pageVariants, spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
@@ -193,6 +194,7 @@ export function AppLayout() {
               <Button onClick={() => openNew()} className="hidden sm:inline-flex">
                 <Plus /> Novo lançamento
               </Button>
+              <AlertsBell />
               <ThemeToggle />
               <SignOutButton />
             </div>

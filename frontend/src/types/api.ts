@@ -133,6 +133,8 @@ export interface Bill {
   account_name: string | null
   account_color: string | null
   default_amount_cents: number
+  /** Conta variável (luz, água): parcelas nascem como estimativa. */
+  variable_amount: boolean
   color: string
   archived_at: string | null
   notes: string | null
@@ -166,6 +168,10 @@ export interface BillInstallment {
   recurrence_id: string | null
   due_date: string
   amount_cents: number
+  /** Valor provisório até a confirmação do real. */
+  is_estimate: boolean
+  estimated_amount_cents: number | null
+  split_id: string | null
   status: BillInstallmentStatus
   paid_at: string | null
   transaction_id: string | null
@@ -275,6 +281,7 @@ export interface CalendarEvent {
   open_cents: number
   status: CalendarStatus
   color: string
+  estimated: boolean
 }
 
 export interface CalendarDay {
@@ -324,6 +331,8 @@ export interface PartyBalance {
   account_name: string | null
   origin_transaction_id: string | null
   status: PartyStatus
+  /** Gerado por rateio de conta da casa: desfeito só pelo rateio. */
+  from_split: boolean
   notes: string | null
   cancel_reason: string | null
   created_at: string
@@ -378,6 +387,62 @@ export interface PersonPosition {
   summary: PartySummary
   net_cents: number
   balances: PartyBalanceDetail[]
+}
+
+// ---------- Rateio ----------
+
+export type SplitMethod = 'EQUAL' | 'FIXED' | 'PERCENT'
+
+export interface SplitPart {
+  id: string
+  person_id: string
+  person_name: string
+  share_cents: number
+  percent_bp: number | null
+  party_balance_id: string
+  received_cents: number
+  open_cents: number
+  status: PartyStatus
+}
+
+export interface ExpenseSplit {
+  id: string
+  bill_installment_id: string
+  bill_name: string
+  due_date: string
+  method: SplitMethod
+  include_owner: boolean
+  total_cents: number
+  owner_share_cents: number
+  others_cents: number
+  received_cents: number
+  net_cost_cents: number
+  cancelled_at: string | null
+  cancel_reason: string | null
+  created_at: string
+  parts: SplitPart[]
+}
+
+// ---------- Alertas ----------
+
+export type AlertKind = 'DUE_SOON' | 'DUE_TODAY' | 'OVERDUE' | 'RECEIVABLE_OVERDUE' | 'CARD_UTILIZATION' | 'ESTIMATE_PENDING'
+
+export interface AppAlert {
+  key: string
+  kind: AlertKind
+  severity: 'info' | 'warning' | 'danger'
+  title: string
+  message: string
+  date: string | null
+  amount_cents: number | null
+  source: string
+  source_id: string
+  link: string
+}
+
+export interface AlertList {
+  items: AppAlert[]
+  counts: { total: number; danger: number; warning: number; info: number }
 }
 
 export interface ApiErrorBody {

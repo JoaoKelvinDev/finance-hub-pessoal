@@ -47,4 +47,4 @@ cd frontend && npm run build       # checagem de tipos + build
 
 ## Estado atual
 
-Etapas 0 e 1 concluídas (contas, lançamentos, transferências, pessoas, categorias e dashboard). Próximas etapas em [`docs/BACKLOG.md`](docs/BACKLOG.md).
+Etapas 0 a 4 concluídas: contas e lançamentos, cartões e faturas, contas da casa com recorrências (estimado × real, rateios e alertas in-app), valores com terceiros e calendário financeiro. A Etapa 5 (orçamentos, metas, projeção, relatórios e exportações) está em [`docs/BACKLOG.md`](docs/BACKLOG.md).

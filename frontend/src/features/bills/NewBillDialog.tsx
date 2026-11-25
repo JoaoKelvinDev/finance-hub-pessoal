@@ -53,6 +53,7 @@ export function NewBillDialog({ open, onOpenChange, billToEdit, onSuccess }: New
     description: '',
     account_id: '',
     default_amount_cents: '',
+    variable_amount: false,
     color: '#EF4444',
     notes: '',
   })
@@ -86,6 +87,7 @@ export function NewBillDialog({ open, onOpenChange, billToEdit, onSuccess }: New
       description: form.description || undefined,
       account_id: form.account_id,
       default_amount_cents: parseInt(form.default_amount_cents.replace(/\D/g, ''), 10),
+      variable_amount: form.variable_amount,
       color: form.color,
       notes: form.notes || undefined,
     }
@@ -153,7 +155,7 @@ export function NewBillDialog({ open, onOpenChange, billToEdit, onSuccess }: New
             )}
           </Field>
 
-          <Field label="Valor padrão *" error={errors.default_amount_cents} hint="Valor típico em centavos (ex: 15000 = R$ 150,00)">
+          <Field label="Valor padrão *" error={errors.default_amount_cents} hint={form.variable_amount ? 'Use a média dos últimos meses; vira estimativa até você informar o real.' : 'Valor cobrado todo período.'}>
             {(props) => (
               <CurrencyInput
                 {...props}
@@ -186,6 +188,22 @@ export function NewBillDialog({ open, onOpenChange, billToEdit, onSuccess }: New
             )}
           </Field>
         </div>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-surface-2">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[var(--color-accent)]"
+            checked={form.variable_amount}
+            onChange={(e) => setForm({ ...form, variable_amount: e.target.checked })}
+            disabled={mutation.isPending}
+          />
+          <span>
+            <span className="block text-sm font-medium">Valor varia todo mês</span>
+            <span className="block text-xs text-muted">
+              Luz, água, gás… As parcelas nascem como estimativa e você confirma o valor real quando a conta chegar.
+            </span>
+          </span>
+        </label>
 
         <Field label="Descrição" error={errors.description}>
           {(props) => (

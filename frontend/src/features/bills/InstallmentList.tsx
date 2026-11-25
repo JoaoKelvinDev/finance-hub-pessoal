@@ -1,12 +1,14 @@
-import { CalendarClock, Check, ChevronDown, ChevronUp, RotateCcw, SkipForward, Trash2, X } from 'lucide-react'
+import { Calculator, CalendarClock, Check, ChevronDown, ChevronUp, RotateCcw, SkipForward, Trash2, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { CurrencyDisplay } from '@/components/finance/currency'
 import { formatDate } from '@/lib/date'
-import { useBillInstallments, usePayBillInstallment, useReverseBillInstallment, useSkipBillInstallment, useCancelBillInstallment } from '@/lib/queries'
+import { useBillInstallments, useReverseBillInstallment, useSkipBillInstallment, useCancelBillInstallment } from '@/lib/queries'
 import { Tooltip } from '@/components/ui/misc'
+import { ConfirmAmountDialog, SplitDialog } from '@/features/bills/SplitDialog'
+import { PayInstallmentDialog } from '@/features/bills/PayInstallmentDialog'
 import { cn } from '@/lib/utils'
 import type { BillInstallment } from '@/types/api'
 
@@ -25,7 +27,6 @@ interface InstallmentListProps {
   status?: string
   dueFrom?: string
   dueTo?: string
-  onInstallmentClick?: (installment: BillInstallment) => void
 }
 
 export function InstallmentList({
@@ -34,7 +35,6 @@ export function InstallmentList({
   status,
   dueFrom,
   dueTo,
-  onInstallmentClick,
 }: InstallmentListProps) {
   const { data, isLoading, isError, error, refetch } = useBillInstallments({
     bill_id: billId,
@@ -45,28 +45,21 @@ export function InstallmentList({
     limit: 20,
   })
 
-  const payMutation = usePayBillInstallment()
   const reverseMutation = useReverseBillInstallment()
   const skipMutation = useSkipBillInstallment()
   const cancelMutation = useCancelBillInstallment()
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [confirmAmount, setConfirmAmount] = useState<BillInstallment | null>(null)
+  const [splitInstallment, setSplitInstallment] = useState<BillInstallment | null>(null)
+  const [payInstallment, setPayInstallment] = useState<BillInstallment | null>(null)
 
   const allItems = data?.items ?? []
   const total = data?.total ?? 0
 
-  const handlePay = async (installment: BillInstallment) => {
-    try {
-      await payMutation.mutateAsync({
-        installmentId: installment.id,
-        account_id: '', // Will be filled in dialog
-        paid_on: new Date().toISOString().split('T')[0],
-        amount_cents: installment.amount_cents,
-      })
-      refetch()
-    } catch {
-      // handled by dialog
-    }
+  /** Abre o pagamento da parcela — pela tela da própria lista, com todos os dados reais. */
+  const handlePay = (installment: BillInstallment) => {
+    setPayInstallment(installment)
   }
 
   const handleReverse = async (id: string) => {
@@ -130,14 +123,15 @@ export function InstallmentList({
           onToggle={() => setExpandedId(expandedId === installment.id ? null : installment.id)}
           onClick={(e) => {
             if (!(e.target as HTMLElement).closest('button') && !(e.target as HTMLElement).closest('a')) {
-              onInstallmentClick?.(installment)
+              if (['PENDING', 'POSTED'].includes(installment.status)) setPayInstallment(installment)
             }
           }}
           onPay={handlePay}
           onReverse={handleReverse}
           onSkip={handleSkip}
           onCancel={handleCancel}
-          isPaying={payMutation.variables?.installmentId === installment.id && payMutation.isPending}
+          onConfirmAmount={setConfirmAmount}
+          onSplit={setSplitInstallment}
           isReversing={reverseMutation.variables?.installmentId === installment.id && reverseMutation.isPending}
           isSkipping={skipMutation.variables?.installmentId === installment.id && skipMutation.isPending}
           isCancelling={cancelMutation.variables?.installmentId === installment.id && cancelMutation.isPending}
@@ -145,6 +139,15 @@ export function InstallmentList({
       ))}
 
       <p className="text-center text-sm text-muted">Total: {total} parcela{total !== 1 ? 's' : ''}</p>
+
+      <ConfirmAmountDialog installment={confirmAmount} onClose={() => setConfirmAmount(null)} />
+      <SplitDialog installment={splitInstallment} onClose={() => setSplitInstallment(null)} />
+      <PayInstallmentDialog
+        open={!!payInstallment}
+        onOpenChange={(open) => { if (!open) setPayInstallment(null) }}
+        installment={payInstallment}
+        onSuccess={() => { setPayInstallment(null); refetch() }}
+      />
     </div>
   )
 }
@@ -158,7 +161,8 @@ interface InstallmentCardProps {
   onReverse: (id: string) => void
   onSkip: (id: string) => void
   onCancel: (id: string) => void
-  isPaying: boolean
+  onConfirmAmount: (installment: BillInstallment) => void
+  onSplit: (installment: BillInstallment) => void
   isReversing: boolean
   isSkipping: boolean
   isCancelling: boolean
@@ -173,7 +177,8 @@ function InstallmentCard({
   onReverse,
   onSkip,
   onCancel,
-  isPaying,
+  onConfirmAmount,
+  onSplit,
   isReversing,
   isSkipping,
   isCancelling,
@@ -183,6 +188,9 @@ function InstallmentCard({
   const isReversible = installment.status === 'PAID'
   const isSkippable = ['PENDING', 'POSTED'].includes(installment.status)
   const isCancellable = ['PENDING', 'POSTED', 'SKIPPED'].includes(installment.status)
+  const isPayable = ['PENDING', 'POSTED'].includes(installment.status)
+  // O rateio só faz sentido com o valor confirmado e a parcela em aberto.
+  const isSplittable = !installment.is_estimate && !['CANCELLED', 'SKIPPED', 'REVERSED'].includes(installment.status)
 
   return (
     <Card
@@ -211,6 +219,16 @@ function InstallmentCard({
                 {statusInfo.icon}
                 <span className="ml-1">{statusInfo.label}</span>
               </span>
+              {installment.is_estimate && (
+                <span className="shrink-0 rounded bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted">
+                  Estimado
+                </span>
+              )}
+              {installment.split_id && (
+                <span className="shrink-0 rounded bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted">
+                  Rateado
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-1">
@@ -265,6 +283,13 @@ function InstallmentCard({
                 </div>
               </div>
 
+              {installment.is_estimate && (
+                <p className="text-xs text-muted">
+                  Valor estimado: <CurrencyDisplay cents={installment.amount_cents} animated={false} className="inline" />.
+                  Informe o valor real da conta para ratear e pagar.
+                </p>
+              )}
+
               {installment.notes && (
                 <div>
                   <p className="text-xs text-muted">Observações</p>
@@ -273,6 +298,24 @@ function InstallmentCard({
               )}
 
               <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-border">
+                {installment.is_estimate && isPayable && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onConfirmAmount(installment); }}
+                  >
+                    <Calculator className="size-3.5 mr-1" /> Informar valor real
+                  </Button>
+                )}
+                {isSplittable && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onSplit(installment); }}
+                  >
+                    <Users className="size-3.5 mr-1" /> {installment.split_id ? 'Ver rateio' : 'Ratear'}
+                  </Button>
+                )}
                 {isSkippable && !isPaid && (
                   <Button
                     variant="secondary"
@@ -295,13 +338,10 @@ function InstallmentCard({
                     <Trash2 className="size-3.5 mr-1" /> Cancelar
                   </Button>
                 )}
-                {!isPaid && !isCancellable && !isSkippable && (
+                {isPayable && (
                   <Button
-                    variant="secondary"
                     size="sm"
                     onClick={(e) => { e.stopPropagation(); onPay(installment); }}
-                    loading={isPaying}
-                    disabled={isPaying}
                   >
                     Pagar
                   </Button>

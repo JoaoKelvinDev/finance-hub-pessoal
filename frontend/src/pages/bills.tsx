@@ -10,9 +10,7 @@ import { InstallmentList } from '@/features/bills/InstallmentList'
 import { NewBillDialog } from '@/features/bills/NewBillDialog'
 import { NewRecurrenceDialog } from '@/features/bills/NewRecurrenceDialog'
 import { NewInstallmentDialog } from '@/features/bills/NewInstallmentDialog'
-import { PayInstallmentDialog } from '@/features/bills/PayInstallmentDialog'
 import type { Recurrence } from '@/types/api'
-import type { BillInstallment } from '@/types/api'
 
 export function BillsPage() {
   const [activeTab, setActiveTab] = useState<'bills' | 'recurrences' | 'installments'>('bills')
@@ -21,7 +19,6 @@ export function BillsPage() {
   const [newInstallmentOpen, setNewInstallmentOpen] = useState(false)
   const [selectedBill, setSelectedBill] = useState<{ id: string; name: string } | null>(null)
   const [selectedRecurrence, setSelectedRecurrence] = useState<{ id: string; name: string } | null>(null)
-  const [payInstallment, setPayInstallment] = useState<{ id: string; billName: string } | null>(null)
 
   const handleNewBill = () => {
     setNewBillOpen(true)
@@ -46,10 +43,6 @@ export function BillsPage() {
   const handleRecurrenceClick = (recurrence: Recurrence) => {
     setSelectedRecurrence({ id: recurrence.id, name: recurrence.bill_name || 'Recorrência' })
     setActiveTab('installments')
-  }
-
-  const handleInstallmentClick = (installment: BillInstallment) => {
-    setPayInstallment({ id: installment.id, billName: installment.bill_name || 'Parcela' })
   }
 
   return (
@@ -132,7 +125,7 @@ export function BillsPage() {
                   }
                 />
                 <CardContent>
-                  <InstallmentList recurrenceId={selectedRecurrence.id} onInstallmentClick={handleInstallmentClick} />
+                  <InstallmentList recurrenceId={selectedRecurrence.id} />
                 </CardContent>
               </Card>
             )}
@@ -153,7 +146,7 @@ export function BillsPage() {
                   }
                 />
                 <CardContent>
-                  <InstallmentList billId={selectedBill.id} onInstallmentClick={handleInstallmentClick} />
+                  <InstallmentList billId={selectedBill.id} />
                 </CardContent>
               </Card>
             )}
@@ -176,12 +169,6 @@ export function BillsPage() {
         bill={selectedBill ? { id: selectedBill.id, name: selectedBill.name, default_amount_cents: 0, color: '#EF4444' } as any : null}
         recurrence={selectedRecurrence ? { id: selectedRecurrence.id, name: selectedRecurrence.name } as any : null}
         onSuccess={() => setNewInstallmentOpen(false)}
-      />
-      <PayInstallmentDialog
-        open={!!payInstallment}
-        onOpenChange={(open) => { if (!open) setPayInstallment(null); }}
-        installment={payInstallment ? { id: payInstallment.id, bill_name: payInstallment.billName, due_date: '', amount_cents: 0 } as any : null}
-        onSuccess={() => setPayInstallment(null)}
       />
     </div>
   )

@@ -4,7 +4,9 @@ import type {
   Account,
   Bill,
   BillInstallment,
+  AlertList,
   CalendarResponse,
+  ExpenseSplit,
   PartyBalanceDetail,
   PartyBalancePage,
   PersonPosition,
@@ -47,6 +49,8 @@ export const keys = {
   overdueInstallments: (limit: number) => ['bills', 'installments', 'overdue', limit] as const,
   calendar: (from: string, to: string) => ['calendar', from, to] as const,
   parties: (q: object) => ['parties', q] as const,
+  split: (installmentId: string) => ['bills', 'split', installmentId] as const,
+  alerts: ['alerts'] as const,
   party: (id: string) => ['parties', 'detail', id] as const,
   personPosition: (id: string) => ['parties', 'person', id] as const,
 }
@@ -125,7 +129,7 @@ function useFinanceMutation<TVars, TOut>(fn: (v: TVars) => Promise<TOut>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar', 'parties']) {
+      for (const k of ['dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar', 'parties', 'alerts']) {
         void qc.invalidateQueries({ queryKey: [k] })
       }
     },
@@ -443,3 +447,47 @@ export const useCancelPartyBalance = () =>
   useFinanceMutation(({ id, reason }: { id: string; reason: string }) =>
     api<PartyBalanceDetail>(`/party-balances/${id}/cancel`, { method: 'POST', body: { reason } }),
   )
+
+// ---------- Estimado × real e rateio ----------
+
+export const useConfirmInstallmentAmount = () =>
+  useFinanceMutation(({ installmentId, amount_cents }: { installmentId: string; amount_cents: number }) =>
+    api<BillInstallment>(`/bills/installments/${installmentId}/confirm-amount`, { method: 'POST', body: { amount_cents } }),
+  )
+
+export function useSplit(installmentId: string | null) {
+  return useQuery({
+    queryKey: keys.split(installmentId ?? ''),
+    queryFn: ({ signal }) => api<ExpenseSplit>(`/bills/installments/${installmentId}/split`, { signal }),
+    enabled: !!installmentId,
+    retry: false,
+  })
+}
+
+export const useCreateSplit = () =>
+  useFinanceMutation(({ installmentId, ...body }: { installmentId: string } & Record<string, unknown>) =>
+    api<ExpenseSplit>(`/bills/installments/${installmentId}/split`, { method: 'POST', body }),
+  )
+
+export const useCancelSplit = () =>
+  useFinanceMutation(({ splitId, reason }: { splitId: string; reason: string }) =>
+    api<ExpenseSplit>(`/bills/splits/${splitId}/cancel`, { method: 'POST', body: { reason } }),
+  )
+
+// ---------- Alertas ----------
+
+export function useAlerts() {
+  return useQuery({
+    queryKey: keys.alerts,
+    queryFn: ({ signal }) => api<AlertList>('/alerts', { signal }),
+    refetchInterval: 5 * 60_000,
+  })
+}
+
+export function useDismissAlert() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) => api<AlertList>('/alerts/dismiss', { method: 'POST', body: { key } }),
+    onSuccess: (data) => qc.setQueryData(keys.alerts, data),
+  })
+}

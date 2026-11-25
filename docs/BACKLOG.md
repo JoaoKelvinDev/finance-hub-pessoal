@@ -15,6 +15,10 @@ Pendências conhecidas: rate limit próprio na API (hoje só o do Supabase Auth)
 ## Etapa 2 — Cartões e faturas
 Cadastro de cartão, `resolve_statement_for_purchase`, ciclos materializados, compras/parcelas, pagamento de fatura, utilização de limite.
 
+- [x] Cartões, compras (à vista e parceladas), faturas e ciclos materializados
+- [x] Pagamento de fatura com idempotência e sem duplicar a despesa no fluxo realizado
+- [x] Utilização de limite e painel por cartão (`/cartoes`, `/cartoes/:id`)
+
 ## Etapa 3 — Contas da casa e recorrências
 Obrigações, recorrências idempotentes, estimado × real, calendário, alertas in-app, rateios.
 
@@ -22,7 +26,11 @@ Obrigações, recorrências idempotentes, estimado × real, calendário, alertas
 - [x] Calendário financeiro: `GET /calendar?from=&to=` (máx. 92 dias) unificando faturas, parcelas de contas,
       previsões virtuais de recorrências (descartadas quando já há parcela com mesmo `recurrence_id`+`due_date`)
       e lançamentos `PLANNED`; pagamentos não viram eventos próprios. Página `/calendario` com Mês, Semana e Agenda.
-- [ ] Estimado × real em contas variáveis, alertas in-app, rateios com contatos
+- [x] Estimado × real: estimativa nas contas variáveis, confirmação do valor real (estimado guardado no histórico)
+- [x] Alertas in-app: `GET /alerts` com estágios D-7/D-3/D-1/D0/vencido, recebível vencido, uso do cartão e
+      estimativa pendente; dispensáveis por chave (o alerta volta quando o estágio agrava)
+- [x] Rateios com contatos: uma despesa, N valores a receber; a despesa não é duplicada e o repasse não é receita
+      (Fluxo D — `expense_splits`, `expense_split_parts`)
 
 ## Etapa 4 — Valores com terceiros
 Empréstimos, adiantamentos, acertos parciais, tela por pessoa.
@@ -39,3 +47,10 @@ Empréstimos, adiantamentos, acertos parciais, tela por pessoa.
 
 ## Etapa 5 — Inteligência e acabamento
 Orçamentos, metas, projeção 30/60/90, relatórios, exportações, backup/restore.
+
+- [ ] Orçamentos por categoria e período (base caixa × competência), avisos em 80% e 100%
+- [ ] Metas e reservas (`goals`, `goal_allocations`): aporte entre contas próprias não é despesa
+- [ ] Projeção de fluxo de caixa em 30/60/90 dias (parcela de cartão e pagamento da fatura não contam como duas saídas)
+- [ ] Relatórios: por categoria, período, cartão e pessoa; aging de recebíveis (0–30 / 31–60 / 61–90 / 90+)
+- [ ] Exportação CSV (UTF-8) e XLSX/PDF progressivas
+- [ ] Performance das consultas, observabilidade e backup/restore testado
