@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.6",
     "pyjwt[crypto]>=2.10",
     "httpx>=0.28",
+    "python-dateutil>=2.9",
 ]
 
 [dependency-groups]
