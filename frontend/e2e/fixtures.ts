@@ -56,6 +56,9 @@ export const test = base.extend<Fixtures>({
     resetDatabase()
     await page.addInitScript(
       ([key, value]) => {
+        // Só na 1ª carga da aba: depois de "Sair" + recarregar, a sessão não pode reaparecer.
+        if (sessionStorage.getItem('e2e-session')) return
+        sessionStorage.setItem('e2e-session', '1')
         localStorage.setItem(key, value)
         localStorage.setItem('fh-theme', 'dark')
       },

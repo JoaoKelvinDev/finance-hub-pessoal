@@ -24,8 +24,12 @@ test('com sessão, abre a visão geral e o login redireciona para dentro', async
   await checkA11y(page)
 })
 
-test('sair encerra a sessão', async ({ page }) => {
+test('sair encerra a sessão mesmo com o servidor de autenticação fora do ar', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Sair' }).click()
   await expect(page).toHaveURL(/\/entrar$/)
+  // A sessão não volta ao recarregar.
+  await page.reload()
+  await expect(page).toHaveURL(/\/entrar$/)
+  expect(await page.evaluate(() => localStorage.getItem('sb-127-auth-token'))).toBeNull()
 })

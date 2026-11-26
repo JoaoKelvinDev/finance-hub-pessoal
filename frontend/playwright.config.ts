@@ -46,7 +46,9 @@ export default defineConfig({
       reuseExistingServer: false,
       env: {
         API_PROXY_TARGET: `http://127.0.0.1:${API_PORT}`,
-        VITE_SUPABASE_URL: 'http://127.0.0.1:54321',
+        // Servidor de autenticação propositalmente inexistente (igual no CI): o app só lê a sessão local,
+        // e "Sair" precisa funcionar mesmo assim. A chave de armazenamento continua "sb-127-auth-token".
+        VITE_SUPABASE_URL: 'http://127.0.0.1:1',
         VITE_SUPABASE_ANON_KEY: 'e2e-anon-key',
       },
     },
