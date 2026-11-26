@@ -1,9 +1,7 @@
 import { ChevronDown, Download, FileSpreadsheet, FileText, Table2 } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { ApiError, apiDownload } from '@/lib/api'
-import { addDays, todayISO } from '@/lib/date'
+import { downloadExport, exportRange } from '@/lib/exports'
 import { cn } from '@/lib/utils'
 
 export type ExportKind =
@@ -22,22 +20,6 @@ const FORMATS: { value: ExportFormat; label: string; hint: string; icon: typeof 
   { value: 'pdf', label: 'PDF', hint: 'Para guardar ou imprimir', icon: FileText },
   { value: 'csv', label: 'CSV', hint: 'Texto simples (Excel pt-BR)', icon: Table2 },
 ]
-
-/** Período efetivo da exportação. Sem período ("Tudo"), usa os últimos 2 anos (limite da API). */
-export function exportRange(from?: string, to?: string) {
-  const end = to || todayISO()
-  // 730 dias cabem no limite da API (2 anos) e evitam datas inválidas como 29/02.
-  return { from: from || addDays(end, -730), to: end }
-}
-
-export async function downloadExport(path: string, params: Record<string, string | undefined>) {
-  try {
-    const name = await apiDownload(path, params)
-    toast.success(`Arquivo ${name} baixado.`)
-  } catch (err) {
-    toast.error(err instanceof ApiError ? err.message : 'Não foi possível exportar.')
-  }
-}
 
 /** Menu de exportação: XLSX, PDF ou CSV do período. */
 export function ExportButton({

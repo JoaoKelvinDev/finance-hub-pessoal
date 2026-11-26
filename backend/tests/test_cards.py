@@ -1,5 +1,6 @@
 """Testes para o módulo de cartões."""
 
+import itertools
 import uuid
 from datetime import date, timedelta
 
@@ -86,15 +87,39 @@ def test_resolve_cycle_start_inclusive_on_closing():
 
 
 def test_resolve_due_date_offset_1():
-    """Vencimento no mês seguinte ao início do ciclo."""
-    due = rules.resolve_due_date(date(2026, 11, 10), 5, 1)
-    assert due == date(2026, 12, 5)
+    """Vencimento no mês seguinte ao FECHAMENTO: fecha 10/12 → vence 05/01."""
+    due = rules.resolve_due_date(date(2026, 12, 10), 5, 1)
+    assert due == date(2027, 1, 5)
+
+
+def test_resolve_due_date_offset_0():
+    """Mesmo mês do fechamento: fecha 25/11 → vence 30/11 (exemplo da especificação invertido)."""
+    assert rules.resolve_due_date(date(2026, 11, 25), 30, 0) == date(2026, 11, 30)
 
 
 def test_resolve_due_date_last_day_adjustment():
     """Se dia de vencimento não existe no mês, usa último dia."""
     due = rules.resolve_due_date(date(2026, 1, 10), 31, 1)  # Fevereiro não tem 31
     assert due == date(2026, 2, 28)
+
+
+def test_fatura_nunca_vence_antes_de_fechar(client):
+    """Regressão: o vencimento era calculado a partir do início do ciclo e caía antes do fechamento."""
+    card = _card(client, closing=10, due=5)
+    _purchase(client, card["id"], total=10000)
+    for s in client.get(f"/api/v1/cards/{card['id']}/statements").json():
+        assert s["due_date"] > s["cycle_end_exclusive"], s
+
+
+def test_vencimento_no_mesmo_mes_antes_do_fechamento_recusado(client):
+    body = {"name": "X", "limit_cents": 1000, "closing_day": 20, "due_day": 5, "due_month_offset": 0,
+            "purchase_boundary_policy": "EXCLUSIVE"}
+    r = client.post("/api/v1/cards", json=body)
+    assert r.status_code == 422 and r.json()["error"]["code"] == "due_before_closing"
+    assert client.post("/api/v1/cards", json={**body, "due_day": 27}).status_code == 201
+    card = _card(client)
+    r = client.patch(f"/api/v1/cards/{card['id']}", json={"due_month_offset": 0})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "due_before_closing"
 
 
 def test_split_installments_exact():
@@ -212,14 +237,24 @@ def test_list_statements(client):
     assert len(stmts) >= 1
 
 
-def test_statement_installments_detail(client):
+def test_parcelas_vao_para_faturas_consecutivas(client):
+    """Regressão: as N parcelas iam todas para a 1ª fatura (cobrança do total de uma vez)."""
     card = _card(client)
-    p = _purchase(client, card["id"], total=60000, installments=3).json()
-    stmts = client.get(f"/api/v1/cards/{card['id']}/statements").json()
-    stmt_id = stmts[0]["id"]
-    insts = client.get(f"/api/v1/cards/statements/{stmt_id}/installments").json()
-    assert len(insts) == 3
-    assert all(i["purchase_id"] == p["id"] for i in insts)
+    p = _purchase(client, card["id"], total=60001, installments=3).json()
+    stmts = sorted(client.get(f"/api/v1/cards/{card['id']}/statements").json(), key=lambda s: s["due_date"])
+    assert len(stmts) == 3
+    assert [s["total_cents"] for s in stmts] == [20001, 20000, 20000]
+    for prev, nxt in itertools.pairwise(stmts):
+        assert nxt["cycle_start_date"] == prev["cycle_end_exclusive"]  # ciclos encadeados, sem buraco
+    for n, s in enumerate(stmts, start=1):
+        insts = client.get(f"/api/v1/cards/statements/{s['id']}/installments").json()
+        assert len(insts) == 1
+        assert insts[0]["purchase_id"] == p["id"] and insts[0]["installment_number"] == n
+
+    # Uma 2ª compra no mesmo mês reaproveita as faturas existentes.
+    _purchase(client, card["id"], total=10000, installments=2)
+    stmts = sorted(client.get(f"/api/v1/cards/{card['id']}/statements").json(), key=lambda s: s["due_date"])
+    assert [s["total_cents"] for s in stmts] == [25001, 25000, 20000]
 
 
 # ---------- API: Pagamento de fatura ----------
@@ -318,18 +353,21 @@ def test_pay_statement_idempotency(client):
 
 
 def test_payment_marks_installments_paid(client):
-    """Pagamento integral marca parcelas como PAID."""
+    """Pagamento integral marca as parcelas daquela fatura como PAID (e só elas)."""
     acc = _account(client, opening=200000)
     card = _card(client, default_payment_account_id=acc["id"])
     _purchase(client, card["id"], total=60000, installments=3)
 
-    stmts = client.get(f"/api/v1/cards/{card['id']}/statements").json()
+    stmts = sorted(client.get(f"/api/v1/cards/{card['id']}/statements").json(), key=lambda s: s["due_date"])
     stmt_id = stmts[0]["id"]
 
-    _pay_statement(client, stmt_id, acc["id"], 60000)
+    r = _pay_statement(client, stmt_id, acc["id"], 20000)
+    assert r.status_code == 201, r.text
 
     insts = client.get(f"/api/v1/cards/statements/{stmt_id}/installments").json()
-    assert all(i["status"] == "PAID" for i in insts)
+    assert insts and all(i["status"] == "PAID" for i in insts)
+    later = client.get(f"/api/v1/cards/statements/{stmts[1]['id']}/installments").json()
+    assert all(i["status"] != "PAID" for i in later)
 
 
 # ---------- Limite utilizado ----------

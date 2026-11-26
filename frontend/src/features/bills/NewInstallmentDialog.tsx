@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { toast } from 'sonner'
+import { todayISO } from '@/lib/date'
+import { api, ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/field'
@@ -10,7 +12,7 @@ import type { BillInstallment, Bill, Recurrence } from '@/types/api'
 interface NewInstallmentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  bill: Bill
+  bill: Bill | null
   recurrence?: Recurrence | null
   installmentToEdit?: BillInstallment | null
   onSuccess?: () => void
@@ -28,7 +30,7 @@ export function NewInstallmentDialog({
 }: NewInstallmentDialogProps) {
   const isEditing = !!installmentToEdit
   const [form, setForm] = useState({
-    due_date: new Date().toISOString().split('T')[0],
+    due_date: todayISO(),
     amount_cents: '',
     status: 'PENDING' as typeof STATUSES[number],
     notes: '',
@@ -49,6 +51,7 @@ export function NewInstallmentDialog({
       if (err.code === 'validation_error' && err.details) {
         setErrors(err.details as Record<string, string>)
       }
+      toast.error(err instanceof ApiError ? err.message : 'Não foi possível salvar.')
     },
   })
 
@@ -57,7 +60,7 @@ export function NewInstallmentDialog({
     setErrors({})
 
     const payload: Record<string, unknown> = {
-      bill_id: bill.id,
+      bill_id: bill!.id,
       due_date: form.due_date,
       amount_cents: parseInt(form.amount_cents.replace(/\D/g, ''), 10),
       status: form.status,
@@ -70,6 +73,9 @@ export function NewInstallmentDialog({
 
     mutation.mutate(payload)
   }
+
+  // A página monta o diálogo antes de haver conta selecionada; ler bill.name aqui derrubava a tela inteira.
+  if (!bill) return null
 
   return (
     <Dialog

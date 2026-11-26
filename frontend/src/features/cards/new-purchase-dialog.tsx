@@ -1,13 +1,16 @@
-import { useState } from 'react'
-import { CreditCard, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { CreditCard, Minus, Plus } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { toast } from 'sonner'
+import { api, ApiError } from '@/lib/api'
+import { formatBRL } from '@/lib/money'
+import { newIdempotencyKey } from '@/lib/utils'
 import { useCards, useCategories, usePeople } from '@/lib/queries'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/field'
 import { CurrencyInput } from '@/components/finance/currency'
-import { formatDateForInput } from '@/lib/date'
+import { todayISO } from '@/lib/date'
 
 interface NewPurchaseDialogProps {
   open: boolean
@@ -17,17 +20,17 @@ interface NewPurchaseDialogProps {
 }
 
 export function NewPurchaseDialog({ open, onOpenChange, cardId, onSuccess }: NewPurchaseDialogProps) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     card_id: cardId || '',
     description: '',
     merchant: '',
-    purchased_on: formatDateForInput(new Date()),
+    purchased_on: todayISO(),
     total_cents: '',
     installments_count: 1,
     category_id: '',
     person_id: '',
     notes: '',
-  })
+  }))
   const [installmentPreview, setInstallmentPreview] = useState<number[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showInstallments, setShowInstallments] = useState(false)
@@ -38,10 +41,18 @@ export function NewPurchaseDialog({ open, onOpenChange, cardId, onSuccess }: New
 
   const expenseCategories = categories.data?.filter((c) => c.kind === 'EXPENSE') || []
 
+  // Clique duplo ou nova tentativa não duplicam a compra; renova a cada abertura.
+  const idemKey = useRef(newIdempotencyKey())
+  useEffect(() => {
+    if (open) idemKey.current = newIdempotencyKey()
+  }, [open])
+
   const mutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       api('/cards/purchases', { method: 'POST', body }),
-    onSuccess: () => {
+    onSuccess: (_data, body) => {
+      const n = body.installments_count as number
+      toast.success(`Compra de ${formatBRL(body.total_cents as number)}${n > 1 ? ` em ${n}x` : ''} registrada.`)
       onOpenChange(false)
       onSuccess?.()
     },
@@ -49,6 +60,7 @@ export function NewPurchaseDialog({ open, onOpenChange, cardId, onSuccess }: New
       if (err.code === 'validation_error' && err.details) {
         setErrors(err.details as Record<string, string>)
       }
+      toast.error(err instanceof ApiError ? err.message : 'Não foi possível registrar a compra.')
     },
   })
 
@@ -82,6 +94,7 @@ export function NewPurchaseDialog({ open, onOpenChange, cardId, onSuccess }: New
       category_id: form.category_id || undefined,
       person_id: form.person_id || undefined,
       notes: form.notes || undefined,
+      idempotency_key: idemKey.current,
     }
 
     mutation.mutate(payload)
@@ -160,7 +173,7 @@ export function NewPurchaseDialog({ open, onOpenChange, cardId, onSuccess }: New
                 type="date"
                 value={form.purchased_on}
                 onChange={(e) => setForm({ ...form, purchased_on: e.target.value })}
-                max={formatDateForInput(new Date())}
+                max={todayISO()}
                 required
                 disabled={mutation.isPending}
               />
@@ -224,7 +237,7 @@ export function NewPurchaseDialog({ open, onOpenChange, cardId, onSuccess }: New
                   disabled={mutation.isPending || form.installments_count <= 1}
                   aria-label="Diminuir parcelas"
                 >
-                  <Trash2 className="size-4" />
+                  <Minus className="size-4" />
                 </Button>
               </div>
             )}
