@@ -1,4 +1,4 @@
-"""Relatórios, exportação CSV e backup."""
+"""Relatórios, exportação (CSV, XLSX, PDF) e backup."""
 
 import json
 import uuid
@@ -64,24 +64,44 @@ def counterparties(
     return reports.counterparty_report(db, start, end)
 
 
-@router.get("/exports/{kind}.csv")
-def export_csv(
+def _download(name: str, content: bytes, media_type: str) -> Response:
+    return Response(
+        content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"},
+    )
+
+
+@router.get("/exports/bundle.xlsx")
+def export_bundle(
     db: DB,
     rid: RequestId,
-    kind: exports.ExportKind = Path(...),
     date_from: date | None = Query(None, alias="from"),
     date_to: date | None = Query(None, alias="to"),
     basis: str = Query("CASH"),
 ):
-    """CSV para Excel pt-BR (";", vírgula decimal, UTF-8 com BOM). A exportação fica na auditoria."""
+    """Pacote completo em XLSX: uma aba por tipo de exportação, no mesmo período. Fica na auditoria."""
     start, end = _period(date_from, date_to)
-    name, content, _rows = exports.export_csv(db, kind, start, end, _basis(basis), rid)
+    name, content, _rows = exports.export_bundle(db, start, end, _basis(basis), rid)
     db.commit()
-    return Response(
-        content,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"},
-    )
+    return _download(name, content, exports.MEDIA_TYPES["xlsx"])
+
+
+@router.get("/exports/{kind}.{fmt}")
+def export_file(
+    db: DB,
+    rid: RequestId,
+    kind: exports.ExportKind = Path(...),
+    fmt: exports.ExportFormat = Path(...),
+    date_from: date | None = Query(None, alias="from"),
+    date_to: date | None = Query(None, alias="to"),
+    basis: str = Query("CASH"),
+):
+    """CSV (Excel pt-BR: ";", vírgula decimal, UTF-8 com BOM), XLSX ou PDF. A exportação fica na auditoria."""
+    start, end = _period(date_from, date_to)
+    name, content, _rows = exports.export_file(db, kind, fmt, start, end, _basis(basis), rid)
+    db.commit()
+    return _download(name, content, exports.MEDIA_TYPES[fmt])
 
 
 @router.get("/backup", tags=["Backup"])

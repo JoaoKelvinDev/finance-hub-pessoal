@@ -13,8 +13,12 @@ from app.core.errors import Conflict
 from app.models import AuditEvent, IdempotencyRecord
 
 
+def now_local() -> datetime:
+    return datetime.now(ZoneInfo(get_settings().app_timezone))
+
+
 def today_local() -> date:
-    return datetime.now(ZoneInfo(get_settings().app_timezone)).date()
+    return now_local().date()
 
 
 def _default(o):

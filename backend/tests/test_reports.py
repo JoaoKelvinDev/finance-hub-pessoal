@@ -202,6 +202,124 @@ def test_exportacao_csv_para_excel_e_auditada(client):
         assert client.get(f"/api/v1/exports/{kind}.csv", params=_params()).status_code == 200, kind
     assert client.get("/api/v1/exports/inexistente.csv").status_code == 422
 
+    cats = client.get("/api/v1/exports/categories.csv", params=_params()).content.decode("utf-8-sig")
+    assert cats.strip().split("\r\n")[-1] == "Total;;1234,56;0,00;100"
+
+
+def test_rotulo_de_periodo():
+    from app.domains.reporting.exports import period_label
+
+    assert period_label("2026-11") == "nov/2026"
+    assert period_label("2026-01-05") == "05/01/2026"
+    assert period_label("Total") == "Total"
+
+
+def _audits(fmt):
+    from app.core.database import SessionLocal
+    from app.models import AuditEvent
+
+    with SessionLocal() as db:
+        return [a.after_json for a in db.query(AuditEvent).filter_by(entity_type="export", operation=fmt)]
+
+
+def test_exportacao_xlsx_com_numeros_e_datas(client):
+    import io
+    from decimal import Decimal
+
+    from openpyxl import load_workbook
+
+    acc = _account(client)
+    mercado = _cat(client, "Mercado")["id"]
+    _tx(client, acc["id"], "EXPENSE", 123_456, mercado, description="Atacadão")
+    _tx(client, acc["id"], "EXPENSE", 10_001, mercado, description="Feira")
+    _tx(client, acc["id"], "INCOME", 500_000, description="Salário")
+
+    r = client.get("/api/v1/exports/transactions.xlsx", params=_params())
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    assert r.headers["content-disposition"].endswith('.xlsx"')
+    ws = load_workbook(io.BytesIO(r.content)).active
+    assert ws.title == "Lançamentos"
+    assert ws["A1"].value == "Lançamentos"
+    assert ws["A4"].value == "Data" and ws["H4"].value == "Valor (R$)"
+    values = sorted(Decimal(str(ws.cell(row=i, column=8).value)) for i in range(5, 8))
+    assert values == [Decimal("-1234.56"), Decimal("-100.01"), Decimal("5000.00")]
+    assert ws["A5"].value.date() == TODAY  # data de verdade, não texto
+    assert ws["A5"].number_format == "DD/MM/YYYY"
+    assert "R$" in ws["H5"].number_format
+    assert ws.freeze_panes == "A5"
+
+    # Total da planilha = total do relatório (mesma fonte).
+    report = client.get("/api/v1/reports/categories", params=_params()).json()
+    ws = load_workbook(io.BytesIO(client.get("/api/v1/exports/categories.xlsx", params=_params()).content)).active
+    last = ws.max_row
+    assert ws.cell(row=last, column=1).value == "Total"
+    assert Decimal(str(ws.cell(row=last, column=3).value)) * 100 == report["total_cents"] == 133_457
+
+    assert any(a["kind"] == "transactions" and a["format"] == "xlsx" and a["rows"] == 3 for a in _audits("xlsx"))
+
+
+def test_exportacao_pdf_paginada(client):
+    import io
+
+    from pypdf import PdfReader
+
+    acc = _account(client)
+    for i in range(70):
+        _tx(client, acc["id"], "EXPENSE", 123_456 + i, description=f"Compra {i:02d} — café & pão <teste>")
+
+    r = client.get("/api/v1/exports/transactions.pdf", params=_params())
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content.startswith(b"%PDF")
+    pdf = PdfReader(io.BytesIO(r.content))
+    pages = len(pdf.pages)
+    assert pages >= 2
+    first = pdf.pages[0].extract_text()
+    assert "Lançamentos" in first
+    assert "-R$ 1.234,56" in first
+    assert "café & pão <teste>" in first  # texto do usuário escapado corretamente
+    assert f"Página 1 de {pages}" in first
+    assert f"Página {pages} de {pages}" in pdf.pages[-1].extract_text()
+
+    cash = PdfReader(io.BytesIO(client.get("/api/v1/exports/cash-flow.pdf", params=_params()).content))
+    assert "Total" in "".join(p.extract_text() for p in cash.pages)
+    assert any(a["format"] == "pdf" and a["rows"] == 70 for a in _audits("pdf"))
+
+
+def test_todos_os_tipos_em_todos_os_formatos(client):
+    # Banco vazio: tabelas sem linhas também precisam gerar arquivo válido.
+    for fmt in ("csv", "xlsx", "pdf"):
+        for kind in ("transactions", "card-purchases", "party-balances", "categories", "cash-flow", "cards",
+                     "counterparties"):
+            r = client.get(f"/api/v1/exports/{kind}.{fmt}", params=_params())
+            assert r.status_code == 200, (kind, fmt, r.text)
+    assert client.get("/api/v1/exports/transactions.docx").status_code == 422
+    bad = {"from": D, "to": (TODAY - timedelta(days=1)).isoformat()}
+    assert client.get("/api/v1/exports/transactions.pdf", params=bad).status_code == 422
+    assert client.get("/api/v1/exports/bundle.xlsx", params=bad).status_code == 422
+
+
+def test_pacote_completo_xlsx(client):
+    import io
+
+    from openpyxl import load_workbook
+
+    acc = _account(client)
+    _tx(client, acc["id"], "EXPENSE", 5_000, _cat(client, "Mercado")["id"])
+    card = _card(client, acc["id"])
+    _purchase(client, card["id"], 30_000, "iFood", n=2)
+
+    r = client.get("/api/v1/exports/bundle.xlsx", params=_params())
+    assert r.status_code == 200, r.text
+    assert "finance-hub-completo-" in r.headers["content-disposition"]
+    wb = load_workbook(io.BytesIO(r.content))
+    assert wb.sheetnames == ["Lançamentos", "Compras no cartão", "Categorias", "Fluxo de caixa", "Cartões",
+                             "Terceiros - atrasos", "Terceiros - valores"]
+    assert wb["Compras no cartão"]["C5"].value == "iFood"
+    audit = next(a for a in _audits("xlsx") if a["kind"] == "bundle")
+    assert len(audit["sheets"]) == 7
+
 
 # ---------- backup ----------
 
@@ -266,7 +384,9 @@ def test_restauracao_recusa_revisao_diferente(client):
 
 def test_relatorios_exigem_proprietario(anon_client):
     for path in ("/api/v1/reports/categories", "/api/v1/reports/cash-flow", "/api/v1/reports/cards",
-                 "/api/v1/reports/counterparties", "/api/v1/exports/transactions.csv", "/api/v1/backup"):
+                 "/api/v1/reports/counterparties", "/api/v1/exports/transactions.csv",
+                 "/api/v1/exports/transactions.xlsx", "/api/v1/exports/cards.pdf", "/api/v1/exports/bundle.xlsx",
+                 "/api/v1/backup"):
         assert anon_client.get(path).status_code == 401, path
 
 
