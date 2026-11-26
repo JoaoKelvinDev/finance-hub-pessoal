@@ -132,7 +132,9 @@ def is_recurrence_active(
         return False
 
     if current_date is None:
-        current_date = date.today()
+        from app.domains.support import today_local  # data civil no fuso do app, não do servidor
+
+        current_date = today_local()
 
     if start_date and current_date < start_date:
         return False
