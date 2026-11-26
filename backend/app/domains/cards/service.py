@@ -72,15 +72,10 @@ def _active_payment_account(db: Session, account_id: uuid.UUID) -> FinancialAcco
     return _active_account(db, account_id)
 
 
-def _find_or_create_statement(
-    db: Session,
-    card: CreditCard,
-    purchase_date: date,
-) -> CardStatement:
-    """Encontra ou cria a fatura (ciclo) para uma data de compra."""
-    cycle_start = rules.resolve_cycle_start(card.closing_day, purchase_date, card.purchase_boundary_policy)
+def _find_or_create_statement(db: Session, card: CreditCard, cycle_start: date) -> CardStatement:
+    """Encontra ou cria a fatura do ciclo que começa em `cycle_start`."""
     cycle_start, cycle_end = rules.resolve_cycle_dates(cycle_start)
-    due_date = rules.resolve_due_date(cycle_start, card.due_day, card.due_month_offset)
+    due_date = rules.resolve_due_date(cycle_end, card.due_day, card.due_month_offset)
 
     # Busca fatura existente para este ciclo
     stmt = db.scalar(
@@ -137,6 +132,7 @@ def create_card(db: Session, data: CardCreate, request_id: str | None) -> Credit
     rules.validate_closing_day(data.closing_day)
     rules.validate_due_day(data.due_day)
     rules.validate_due_month_offset(data.due_month_offset)
+    rules.validate_due_after_closing(data.closing_day, data.due_day, data.due_month_offset)
 
     card = CreditCard(**data.model_dump())
     db.add(card)
@@ -162,6 +158,11 @@ def update_card(db: Session, card_id: uuid.UUID, data: CardUpdate, request_id: s
         rules.validate_due_month_offset(changes["due_month_offset"])
     if changes.get("default_payment_account_id"):
         _active_payment_account(db, changes["default_payment_account_id"])
+    rules.validate_due_after_closing(
+        changes.get("closing_day", card.closing_day),
+        changes.get("due_day", card.due_day),
+        changes.get("due_month_offset", card.due_month_offset),
+    )
 
     for k, v in changes.items():
         setattr(card, k, v)
@@ -219,8 +220,8 @@ def create_purchase(db: Session, data: PurchaseCreate, request_id: str | None) -
             if db.get(Person, data.person_id) is None:
                 raise NotFound("Pessoa")
 
-        # Encontra/cria fatura para esta compra
-        stmt = _find_or_create_statement(db, card, data.purchased_on)
+        # Ciclo da 1ª parcela; a parcela N vai para o ciclo N−1 meses depois.
+        first_cycle = rules.resolve_cycle_start(card.closing_day, data.purchased_on, card.purchase_boundary_policy)
 
         # Cria compra
         purchase = CardPurchase(
@@ -238,9 +239,12 @@ def create_purchase(db: Session, data: PurchaseCreate, request_id: str | None) -
         db.add(purchase)
         db.flush()
 
-        # Cria parcelas
+        # Cria parcelas: uma por fatura, em ciclos consecutivos (antes iam todas para a 1ª fatura).
         amounts = rules.split_installments(data.total_cents, data.installments_count)
+        statements: list[CardStatement] = []
         for idx, amt in enumerate(amounts, start=1):
+            stmt = _find_or_create_statement(db, card, rules.add_months(first_cycle, idx - 1))
+            statements.append(stmt)
             inst = CardInstallment(
                 purchase_id=purchase.id,
                 statement_id=stmt.id,
@@ -252,13 +256,12 @@ def create_purchase(db: Session, data: PurchaseCreate, request_id: str | None) -
 
         db.flush()
 
-        # Atualiza total da fatura
-        stmt_total = _recalc_statement_total(db, stmt.id)
-        # Atualiza status da fatura
-        _update_statement_status(db, stmt)
-
         audit(db, "card_purchase", purchase.id, "create", None, snapshot(purchase, PURCHASE_AUDIT_FIELDS), request_id)
-        audit(db, "card_statement", stmt.id, "update", {"total_cents": stmt_total}, snapshot(stmt, STATEMENT_AUDIT_FIELDS), request_id)
+        for stmt in statements:
+            stmt_total = _recalc_statement_total(db, stmt.id)
+            _update_statement_status(db, stmt)
+            audit(db, "card_statement", stmt.id, "update", {"total_cents": stmt_total},
+                  snapshot(stmt, STATEMENT_AUDIT_FIELDS), request_id)
 
         return purchase.id
 
