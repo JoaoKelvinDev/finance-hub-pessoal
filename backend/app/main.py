@@ -9,7 +9,13 @@ from app.core.logging import configure_logging, install_request_id
 settings = get_settings()
 configure_logging(settings.log_level)
 
-app = FastAPI(title="Finance Hub Pessoal", version="0.1.0", docs_url="/docs", redoc_url=None)
+app = FastAPI(
+    title="Finance Hub Pessoal",
+    version="0.1.0",
+    docs_url="/docs" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+    redoc_url=None,
+)
 install_request_id(app)
 install_error_handlers(app)
 app.add_middleware(
