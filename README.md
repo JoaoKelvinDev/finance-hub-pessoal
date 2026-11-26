@@ -49,6 +49,20 @@ conta e lançamentos, transferência, cartão (compra parcelada → faturas → 
 da casa + calendário, terceiros, orçamento, relatórios com download (XLSX/PDF/CSV) e uso no celular, além de
 verificação de acessibilidade (axe, WCAG 2.1 AA) nas telas principais. Rodam no CI em todo PR.
 
+## Produção (gratuito)
+
+- **App**: https://finance-hub-pessoal.vercel.app — Vercel Hobby com **Services** (beta): frontend Vite e
+  API FastAPI no mesmo projeto e domínio (`vercel.json`). Publica sozinho a cada push na `main`.
+- **Banco + login**: Supabase Free, projeto `finance-hub` (São Paulo). Cadastro público desligado; só o
+  `OWNER_SUBJECT` acessa. A API usa o pooler em modo transação (porta 6543).
+- **Migrações**: workflow `Migrações (produção)` roda `alembic upgrade head` quando a `main` muda
+  (secret `PROD_MIGRATIONS_DATABASE_URL`, pooler em modo sessão, porta 5432).
+- **Backup**: repositório **privado** `finance-hub-backups` — `pg_dump` diário criptografado (AES-256),
+  guardado 90 dias e **restaurado num banco vazio a cada execução** para provar que funciona. O acesso
+  diário também evita que o Supabase gratuito pause o projeto. A senha fica no gerenciador de senhas do dono.
+- Variáveis na Vercel: `DATABASE_URL`, `SUPABASE_URL`, `OWNER_SUBJECT`, `CORS_ORIGINS`, `APP_TIMEZONE`,
+  `DOCS_ENABLED=false`, `LOG_LEVEL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (chave *publishable*).
+
 ## Segurança
 
 - Não existe cadastro de usuários: `enable_signup = false` no Supabase e a API aceita **apenas** o `OWNER_SUBJECT`.
