@@ -32,12 +32,38 @@ def create_owner(email: str, password: str) -> str:
     return r.json()["id"]
 
 
+def restore_backup(path: str) -> None:
+    """Restaura o backup numa única transação; recusa banco com dados (nunca sobrescreve)."""
+    import json
+
+    from app.core.database import SessionLocal
+    from app.core.errors import DomainError
+    from app.domains.backup import restore
+
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    with SessionLocal() as db:
+        try:
+            counts = restore(db, data)
+            db.commit()
+        except DomainError as e:
+            db.rollback()
+            sys.exit(f"Restauração recusada: {e.message}")
+    total = sum(counts.values())
+    print(f"Backup restaurado: {total} registros em {len([c for c in counts.values() if c])} tabelas.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
     co = sub.add_parser("create-owner")
     co.add_argument("--email", required=True)
+    rs = sub.add_parser("restore", help="Restaura um backup JSON num banco VAZIO (mesma revisão do Alembic).")
+    rs.add_argument("--file", required=True)
     args = parser.parse_args()
+    if args.cmd == "restore":
+        restore_backup(args.file)
+        return
 
     if args.cmd == "create-owner":
         password = os.environ.get("FH_OWNER_PASSWORD") or getpass.getpass("Senha do proprietário: ")

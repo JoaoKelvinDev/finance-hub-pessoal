@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { formatDate } from '@/lib/date'
+import { formatDate, todayISO } from '@/lib/date'
 import { useRecurrences, usePostRecurrenceInstallments } from '@/lib/queries'
 import { Tooltip } from '@/components/ui/misc'
 import { cn } from '@/lib/utils'
@@ -37,7 +37,7 @@ export function RecurrenceList({ billId, status, onRecurrenceClick }: Recurrence
 
   const handlePostInstallments = async (id: string) => {
     try {
-      await postInstallments.mutateAsync({ recurrenceId: id, up_to_date: new Date().toISOString().split('T')[0] })
+      await postInstallments.mutateAsync({ recurrenceId: id, up_to_date: todayISO() })
       refetch()
     } catch {
       // error handled by mutation
@@ -87,6 +87,7 @@ export function RecurrenceList({ billId, status, onRecurrenceClick }: Recurrence
               onRecurrenceClick?.(recurrence)
             }
           }}
+          onOpen={() => onRecurrenceClick?.(recurrence)}
           onPostInstallments={handlePostInstallments}
           isPosting={postInstallments.variables?.recurrenceId === recurrence.id && postInstallments.isPending}
         />
@@ -100,6 +101,8 @@ interface RecurrenceCardProps {
   isExpanded: boolean
   onToggle: () => void
   onClick: (e: React.MouseEvent) => void
+  /** Abre as parcelas. O clique no card ignora botões, então "Ver parcelas" precisa chamar isto direto. */
+  onOpen: () => void
   onPostInstallments: (id: string) => void
   isPosting: boolean
 }
@@ -109,6 +112,7 @@ function RecurrenceCard({
   isExpanded,
   onToggle,
   onClick,
+  onOpen,
   onPostInstallments,
   isPosting,
 }: RecurrenceCardProps) {
@@ -232,7 +236,7 @@ function RecurrenceCard({
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={(e) => { e.stopPropagation(); onClick(e); }}
+                  onClick={(e) => { e.stopPropagation(); onOpen(); }}
                 >
                   Ver parcelas
                 </Button>

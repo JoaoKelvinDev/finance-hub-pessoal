@@ -8,14 +8,7 @@
     <meta name="theme-color" content="#0B0D10" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F7F7F5" media="(prefers-color-scheme: light)" />
     <title>Finance Hub</title>
-    <script>
-      // Aplica o tema antes da pintura para evitar flash.
-      try {
-        var t = localStorage.getItem('fh-theme') || 'system'
-        var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
-        document.documentElement.classList.toggle('dark', dark)
-      } catch (e) {}
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

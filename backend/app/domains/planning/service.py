@@ -100,23 +100,6 @@ def _bill_category_ids(db: Session) -> dict[str, UUID]:
 
 # ---------- consumo ----------
 
-def _manual_expense_cents(db: Session, scope: list[UUID] | None, start: date, end: date) -> int:
-    """Despesas manuais efetivadas (sem cartão e sem pagamento de conta da casa)."""
-    conds = [
-        Transaction.status == "POSTED",
-        Transaction.kind.in_(EXPENSE_KINDS),
-        Transaction.effective_date.between(start, end),
-        or_(
-            Transaction.source_type.is_(None),
-            Transaction.source_type.notin_(("statement_payment", "bill_payment")),
-        ),
-    ]
-    if scope is not None:
-        conds.append(Transaction.category_id.in_(scope))
-    total = db.scalar(select(func.coalesce(func.sum(Transaction.amount_cents), 0)).where(*conds))
-    return abs(int(total or 0))
-
-
 def _statement_total(db: Session, statement_id: UUID) -> int:
     total = db.scalar(
         select(func.coalesce(func.sum(CardInstallment.amount_cents), 0)).where(
@@ -125,62 +108,6 @@ def _statement_total(db: Session, statement_id: UUID) -> int:
         )
     )
     return int(total or 0)
-
-
-def _card_cash_cents(db: Session, scope: list[UUID] | None, start: date, end: date) -> int:
-    """Cartão em regime de caixa: o que saiu da conta no período, por categoria.
-
-    O pagamento da fatura é o evento de caixa; as compras não viram despesa antes dele.
-    A atribuição por categoria é proporcional ao quanto foi pago da fatura.
-    """
-    rows = db.execute(
-        select(Transaction.source_id, func.sum(Transaction.amount_cents))
-        .where(
-            Transaction.status == "POSTED",
-            Transaction.source_type == "statement_payment",
-            Transaction.effective_date.between(start, end),
-        )
-        .group_by(Transaction.source_id)
-    ).all()
-
-    total = 0
-    for statement_id, paid in rows:
-        if statement_id is None:
-            continue
-        stmt_total = _statement_total(db, statement_id)
-        if stmt_total <= 0:
-            continue
-        paid_cents = min(abs(int(paid or 0)), stmt_total)
-        for amount, category_id in db.execute(
-            select(CardInstallment.amount_cents, CardPurchase.category_id)
-            .join(CardPurchase, CardPurchase.id == CardInstallment.purchase_id)
-            .where(
-                CardInstallment.statement_id == statement_id,
-                CardInstallment.status.notin_(("REVERSED", "CANCELLED")),
-            )
-        ).all():
-            if scope is not None and category_id not in scope:
-                continue
-            # Parte paga proporcional, em centavos inteiros (arredonda para baixo).
-            total += int(amount) * paid_cents // stmt_total
-    return total
-
-
-def _card_competence_cents(db: Session, scope: list[UUID] | None, start: date, end: date) -> int:
-    """Cartão em regime de competência: o consumo do período é a compra."""
-    conds = [
-        CardPurchase.purchased_on.between(start, end),
-        CardPurchase.status == "ACTIVE",
-        CardInstallment.status.notin_(("REVERSED", "CANCELLED")),
-    ]
-    if scope is not None:
-        conds.append(CardPurchase.category_id.in_(scope))
-    rows = db.execute(
-        select(CardInstallment.amount_cents)
-        .join(CardPurchase, CardPurchase.id == CardInstallment.purchase_id)
-        .where(*conds)
-    ).all()
-    return sum(int(a) for (a,) in rows)
 
 
 def _bill_installments(db: Session, start: date, end: date) -> list[tuple[int, str, date, str]]:
@@ -195,15 +122,96 @@ def _bill_installments(db: Session, start: date, end: date) -> list[tuple[int, s
     ]
 
 
-def _bill_paid_cents(db: Session, scope: list[UUID] | None, start: date, end: date) -> int:
+Totals = dict[UUID | None, int]
+
+
+def _add(totals: Totals, category_id: UUID | None, cents: int) -> None:
+    if cents:
+        totals[category_id] = totals.get(category_id, 0) + cents
+
+
+def _manual_by_category(db: Session, start: date, end: date, totals: Totals) -> None:
+    """Despesas manuais efetivadas (sem cartão e sem pagamento de conta da casa)."""
+    for category_id, total in db.execute(
+        select(Transaction.category_id, func.sum(Transaction.amount_cents))
+        .where(
+            Transaction.status == "POSTED",
+            Transaction.kind.in_(EXPENSE_KINDS),
+            Transaction.effective_date.between(start, end),
+            or_(
+                Transaction.source_type.is_(None),
+                Transaction.source_type.notin_(("statement_payment", "bill_payment")),
+            ),
+        )
+        .group_by(Transaction.category_id)
+    ).all():
+        _add(totals, category_id, abs(int(total or 0)))
+
+
+def _card_cash_by_category(db: Session, start: date, end: date, totals: Totals) -> None:
+    """Cartão em regime de caixa: o pagamento da fatura é o evento de caixa.
+
+    A atribuição por categoria é proporcional ao quanto foi pago da fatura, em centavos
+    inteiros (arredonda para baixo por parcela).
+    """
+    rows = db.execute(
+        select(Transaction.source_id, func.sum(Transaction.amount_cents))
+        .where(
+            Transaction.status == "POSTED",
+            Transaction.source_type == "statement_payment",
+            Transaction.effective_date.between(start, end),
+        )
+        .group_by(Transaction.source_id)
+    ).all()
+    for statement_id, paid in rows:
+        if statement_id is None:
+            continue
+        stmt_total = _statement_total(db, statement_id)
+        if stmt_total <= 0:
+            continue
+        paid_cents = min(abs(int(paid or 0)), stmt_total)
+        items = db.execute(
+            select(CardInstallment.amount_cents, CardPurchase.category_id)
+            .join(CardPurchase, CardPurchase.id == CardInstallment.purchase_id)
+            .where(
+                CardInstallment.statement_id == statement_id,
+                CardInstallment.status.notin_(("REVERSED", "CANCELLED")),
+            )
+            .order_by(CardInstallment.amount_cents.desc(), CardInstallment.id)
+        ).all()
+        shares = [int(amount) * paid_cents // stmt_total for amount, _ in items]
+        # Centavos que o arredondamento deixou de fora vão para as maiores parcelas:
+        # a soma por categoria fica exatamente igual ao valor pago da fatura.
+        for i in range(paid_cents - sum(shares)):
+            shares[i % len(shares)] += 1
+        for (_, category_id), share in zip(items, shares, strict=True):
+            _add(totals, category_id, share)
+
+
+def _card_competence_by_category(db: Session, start: date, end: date, totals: Totals) -> None:
+    """Cartão em regime de competência: o consumo do período é a compra."""
+    for category_id, total in db.execute(
+        select(CardPurchase.category_id, func.sum(CardInstallment.amount_cents))
+        .join(CardPurchase, CardPurchase.id == CardInstallment.purchase_id)
+        .where(
+            CardPurchase.purchased_on.between(start, end),
+            CardPurchase.status == "ACTIVE",
+            CardInstallment.status.notin_(("REVERSED", "CANCELLED")),
+        )
+        .group_by(CardPurchase.category_id)
+    ).all():
+        _add(totals, category_id, int(total or 0))
+
+
+def _bill_paid_by_category(db: Session, start: date, end: date, totals: Totals) -> None:
     """Parcelas de contas da casa pagas no período (data do pagamento, no fuso do app)."""
-    tz = get_settings().app_timezone
     from zoneinfo import ZoneInfo
 
-    zone = ZoneInfo(tz)
+    zone = ZoneInfo(get_settings().app_timezone)
     lo = datetime.combine(start, time.min, tzinfo=zone).astimezone(UTC)
     hi = datetime.combine(end + timedelta(days=1), time.min, tzinfo=zone).astimezone(UTC)
-    rows = db.execute(
+    mapping = _bill_category_ids(db)
+    for amount, bill_category, paid_at in db.execute(
         select(BillInstallment.amount_cents, Bill.category, BillInstallment.paid_at)
         .join(Bill, Bill.id == BillInstallment.bill_id)
         .where(
@@ -212,32 +220,34 @@ def _bill_paid_cents(db: Session, scope: list[UUID] | None, start: date, end: da
             BillInstallment.paid_at >= lo,
             BillInstallment.paid_at < hi,
         )
-    ).all()
-
-    mapping = _bill_category_ids(db)
-    total = 0
-    for amount, bill_category, paid_at in rows:
-        if paid_at.astimezone(zone).date() < start or paid_at.astimezone(zone).date() > end:
-            continue
-        category_id = mapping.get(bill_category)
-        if scope is not None and (category_id is None or category_id not in scope):
-            continue
-        total += int(amount)
-    return total
+    ).all():
+        if start <= paid_at.astimezone(zone).date() <= end:
+            _add(totals, mapping.get(bill_category), int(amount))
 
 
-def _bill_competence_cents(db: Session, scope: list[UUID] | None, start: date, end: date) -> int:
+def _bill_competence_by_category(db: Session, start: date, end: date, totals: Totals) -> None:
     """Contas da casa em competência: a parcela conta pelo vencimento."""
     mapping = _bill_category_ids(db)
-    total = 0
     for amount, bill_category, _due, status in _bill_installments(db, start, end):
-        if status in ("CANCELLED", "SKIPPED", "REVERSED"):
-            continue
-        category_id = mapping.get(bill_category)
-        if scope is not None and (category_id is None or category_id not in scope):
-            continue
-        total += amount
-    return total
+        if status not in ("CANCELLED", "SKIPPED", "REVERSED"):
+            _add(totals, mapping.get(bill_category), amount)
+
+
+def consumption_by_category(db: Session, start: date, end: date, basis: str) -> Totals:
+    """Consumo do período por categoria (None = sem categoria).
+
+    Fonte única para orçamentos e relatórios: os dois sempre mostram os mesmos números.
+    Transferências, empréstimos e acertos com terceiros nunca entram.
+    """
+    totals: Totals = {}
+    _manual_by_category(db, start, end, totals)
+    if basis == "COMPETENCE":
+        _card_competence_by_category(db, start, end, totals)
+        _bill_competence_by_category(db, start, end, totals)
+    else:
+        _card_cash_by_category(db, start, end, totals)
+        _bill_paid_by_category(db, start, end, totals)
+    return totals
 
 
 def _committed_cents(db: Session, scope: list[UUID] | None, start: date, end: date) -> int:
@@ -283,18 +293,10 @@ def budget_metrics(db: Session, budget: Budget) -> tuple[int, int]:
     """(realizado, comprometido) do orçamento."""
     scope = category_scope(db, budget.category_id)
     start, end = budget.period_start, budget.period_end
+    totals = consumption_by_category(db, start, end, budget.basis)
+    spent = sum(totals.values()) if scope is None else sum(v for k, v in totals.items() if k in scope)
     if budget.basis == "COMPETENCE":
-        spent = (
-            _manual_expense_cents(db, scope, start, end)
-            + _card_competence_cents(db, scope, start, end)
-            + _bill_competence_cents(db, scope, start, end)
-        )
         return spent, 0
-    spent = (
-        _manual_expense_cents(db, scope, start, end)
-        + _card_cash_cents(db, scope, start, end)
-        + _bill_paid_cents(db, scope, start, end)
-    )
     return spent, _committed_cents(db, scope, start, end)
 
 

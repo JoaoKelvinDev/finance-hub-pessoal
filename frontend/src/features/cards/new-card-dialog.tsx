@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { toast } from 'sonner'
+import { api, ApiError } from '@/lib/api'
 import { useAccounts } from '@/lib/queries'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
@@ -56,6 +57,7 @@ export function NewCardDialog({ open, onOpenChange, cardToEdit, onSuccess }: New
       if (err.code === 'validation_error' && err.details) {
         setErrors(err.details as Record<string, string>)
       }
+      toast.error(err instanceof ApiError ? err.message : 'Não foi possível salvar.')
     },
   })
 
@@ -209,6 +211,7 @@ export function NewCardDialog({ open, onOpenChange, cardToEdit, onSuccess }: New
                   disabled={mutation.isPending}
                 />
                 <Input
+                  aria-label="Cor em hexadecimal"
                   value={form.color}
                   onChange={(e) => setForm({ ...form, color: e.target.value })}
                   disabled={mutation.isPending}

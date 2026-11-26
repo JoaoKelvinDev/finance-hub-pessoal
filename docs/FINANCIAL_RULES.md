@@ -50,6 +50,16 @@ Um lançamento efetivado não é apagado: é cancelado (status `CANCELLED`) com 
 - Saldos e fluxo: **caixa** (por `effective_date`).
 - Consumo por categoria: **competência** (a partir da Etapa 2, compras no cartão entram pela competência da parcela).
 
+## Cartão: ciclos, parcelas e vencimento
+
+- Ciclo da compra: `[fechamento anterior, fechamento)`; compra no dia do fechamento segue a política do cartão
+  (`EXCLUSIVE` → próxima fatura, `INCLUSIVE` → fatura atual).
+- **Uma parcela por fatura**: a parcela N vai para o ciclo N−1 meses após o da compra (faturas encadeadas,
+  sem buraco). Até 2026-11 todas as parcelas iam para a 1ª fatura — corrigido com teste de regressão.
+- **Vencimento conta a partir do fechamento** (`cycle_end_exclusive`): `due_month_offset = 1` → dia `due_day` do
+  mês seguinte ao fechamento (fecha 10/12, vence 05/01); `0` → mesmo mês, exigindo `due_day > closing_day`
+  (senão a API recusa com `due_before_closing`). A fatura nunca vence antes de fechar.
+
 ## Dupla contagem — matriz
 
 | Evento | Caixa | Consumo |

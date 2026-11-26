@@ -26,11 +26,22 @@ import './index.css'
 
 // Planejamento (orçamentos/metas/projeção) carrega sob demanda.
 const PlanningPage = lazy(() => import('@/pages/planning').then((m) => ({ default: m.PlanningPage })))
+const ReportsPage = lazy(() => import('@/pages/reports').then((m) => ({ default: m.ReportsPage })))
+
+// Tudo que depende de saldo, fatura ou vencimento. Revalidado após QUALQUER mutação bem-sucedida,
+// inclusive as que usam useMutation direto (ex.: compra no cartão e pagamento de fatura) —
+// antes, essas telas só se atualizavam ao recarregar a página.
+const FINANCE_KEYS = [
+  'dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar', 'parties',
+  'alerts', 'budgets', 'goals', 'projection', 'reports',
+]
 
 const queryClient: QueryClient = new QueryClient({
-  // Qualquer mutação bem-sucedida pode alterar vencimentos: o calendário é sempre revalidado.
   mutationCache: new MutationCache({
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['calendar'] }),
+    // Sem await: o diálogo fecha na hora e as telas se atualizam em seguida.
+    onSuccess: () => {
+      for (const k of FINANCE_KEYS) void queryClient.invalidateQueries({ queryKey: [k] })
+    },
   }),
   defaultOptions: {
     queries: {
@@ -79,6 +90,15 @@ const router = createBrowserRouter([
         ),
       },
       { path: '/em-breve/planejamento', element: <Navigate to="/planejamento" replace /> },
+      {
+        path: '/relatorios',
+        element: (
+          <Suspense fallback={<div className="shimmer h-96 rounded-2xl" />}>
+            <ReportsPage />
+          </Suspense>
+        ),
+      },
+      { path: '/em-breve/relatorios', element: <Navigate to="/relatorios" replace /> },
       { path: '/em-breve/terceiros', element: <Navigate to="/terceiros" replace /> },
       { path: '/configuracoes', element: <SettingsPage /> },
       { path: '/em-breve/:mod', element: <ComingSoonPage /> },

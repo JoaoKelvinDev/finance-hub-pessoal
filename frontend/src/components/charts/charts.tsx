@@ -21,7 +21,7 @@ import { useTheme } from '@/app/theme'
 import { formatDate, formatMonth, formatShortDate } from '@/lib/date'
 import { formatBRL, formatCompactBRL, formatPct } from '@/lib/money'
 import { cn } from '@/lib/utils'
-import type { Dashboard, Projection } from '@/types/api'
+import type { CashFlowReport, Dashboard, Projection } from '@/types/api'
 
 // Paleta categórica validada (dataviz): passo claro -> passo escuro do mesmo slot.
 const DARK_STEP: Record<string, string> = {
@@ -219,7 +219,7 @@ export function BalanceChart({ data, today }: { data: Dashboard['balance_series'
   return (
     <ChartFrame
       title="Evolução do saldo"
-      description={hasProjection ? 'Realizado até hoje; depois, projeção com lançamentos previstos.' : 'Saldo diário das contas ativas.'}
+      description={hasProjection ? 'Realizado até hoje; depois, a projeção base (faturas, contas da casa, previsões e terceiros).' : 'Saldo diário das contas ativas.'}
       legend={
         <div className="flex gap-4">
           <LegendItem color="var(--accent)" label="Realizado" />
@@ -559,6 +559,81 @@ export function ProjectionChart({ data }: { data: Projection }) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
+    </ChartFrame>
+  )
+}
+
+// ---------- Fluxo de caixa (relatório) ----------
+/** Receitas e despesas por período, lado a lado (mesma unidade, um eixo só). */
+export function CashFlowChart({ data }: { data: CashFlowReport }) {
+  const label = (p: string) => (data.granularity === 'day' ? formatShortDate(p) : formatMonth(p))
+  const rows = data.points.map((p) => ({ ...p, label: label(p.period) }))
+  const hasData = rows.some((r) => r.income_cents || r.expense_cents)
+  return (
+    <ChartFrame
+      title="Receitas × despesas"
+      description={`Efetivadas, por ${data.granularity === 'day' ? 'dia' : 'mês'}. Transferências, empréstimos e acertos não entram.`}
+      legend={
+        <div className="flex gap-4">
+          <LegendItem color="var(--positive)" label="Receitas" />
+          <LegendItem color="var(--negative)" label="Despesas" />
+        </div>
+      }
+      table={
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border">
+              <th className={th}>Período</th>
+              <th className={th}>Receitas</th>
+              <th className={th}>Despesas</th>
+              <th className={th}>Resultado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows
+              .filter((r) => r.income_cents || r.expense_cents)
+              .map((r) => (
+                <tr key={r.period} className="border-b border-border/60">
+                  <td className="py-2 pr-3 text-sm">{r.label}</td>
+                  <td className={td}>{formatBRL(r.income_cents)}</td>
+                  <td className={td}>{formatBRL(r.expense_cents)}</td>
+                  <td className={td}>{formatBRL(r.net_cents, { signed: true })}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      }
+    >
+      {hasData ? (
+        <div className="h-72">
+          <ResponsiveContainer>
+            <BarChart data={rows} barGap={2} barCategoryGap="24%" margin={{ top: 12, right: 12, left: 4, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="var(--border)" />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={axis} minTickGap={16} />
+              <YAxis tickLine={false} axisLine={false} tick={axis} width={64} tickFormatter={(v: number) => formatCompactBRL(v)} />
+              <Tooltip
+                cursor={{ fill: 'var(--surface-2)', radius: 6 }}
+                content={({ active, payload }) =>
+                  active && payload?.length ? (
+                    <TipBox
+                      title={(payload[0].payload as (typeof rows)[number]).label}
+                      rows={[
+                        { label: 'Receitas', value: formatBRL(payload[0].payload.income_cents), color: 'var(--positive)' },
+                        { label: 'Despesas', value: formatBRL(payload[0].payload.expense_cents), color: 'var(--negative)' },
+                        { label: 'Resultado', value: formatBRL(payload[0].payload.net_cents, { signed: true }) },
+                      ]}
+                    />
+                  ) : null
+                }
+              />
+              <Bar dataKey="income_cents" fill="var(--positive)" radius={[4, 4, 0, 0]} maxBarSize={20} {...ANIM} />
+              <Bar dataKey="expense_cents" fill="var(--negative)" radius={[4, 4, 0, 0]} maxBarSize={20} {...ANIM} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <ChartEmpty text="Sem receitas ou despesas efetivadas no período." />
+      )}
     </ChartFrame>
   )
 }

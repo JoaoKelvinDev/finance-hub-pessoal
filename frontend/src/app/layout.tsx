@@ -49,13 +49,8 @@ const NAV: { section?: string; items: NavItem[] }[] = [
       { to: '/calendario', label: 'Calendário', icon: CalendarDays },
       { to: '/terceiros', label: 'Valores com terceiros', icon: HandCoins },
       { to: '/planejamento', label: 'Planejamento', icon: Target },
+      { to: '/relatorios', label: 'Relatórios', icon: ChartPie },
       { to: '/pessoas', label: 'Pessoas', icon: Users },
-    ],
-  },
-  {
-    section: 'Próximas etapas',
-    items: [
-      { to: '/em-breve/relatorios', label: 'Relatórios', icon: ChartPie, stage: 5 },
     ],
   },
 ]
@@ -69,6 +64,7 @@ const TITLES: Record<string, string> = {
   '/calendario': 'Calendário financeiro',
   '/terceiros': 'Valores com terceiros',
   '/planejamento': 'Planejamento',
+  '/relatorios': 'Relatórios',
   '/pessoas': 'Pessoas',
   '/configuracoes': 'Configurações',
 }
@@ -304,7 +300,7 @@ function MobileNav({ onNew }: { onNew: () => void }) {
           whileTap={{ scale: 0.92 }}
           onClick={onNew}
           aria-label="Novo lançamento"
-          className="-mt-6 grid size-14 place-items-center rounded-2xl bg-accent text-accent-fg shadow-pop"
+          className="-mt-6 grid size-14 place-items-center rounded-2xl bg-accent-solid text-accent-fg shadow-pop"
         >
           <Plus className="size-6" />
         </motion.button>

@@ -61,7 +61,8 @@ export function TabsTrigger({ value, children, disabled, className }: TabsTrigge
     <button
       role="tab"
       aria-selected={isActive}
-      aria-controls={`tabs-panel-${value}`}
+      // Só o painel ativo é renderizado; apontar para um id inexistente é inválido para leitores de tela.
+      aria-controls={isActive ? `tabs-panel-${value}` : undefined}
       id={`tabs-trigger-${value}`}
       disabled={disabled}
       onClick={() => !disabled && onValueChange(value)}
@@ -70,7 +71,7 @@ export function TabsTrigger({ value, children, disabled, className }: TabsTrigge
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
         isActive
           ? 'bg-surface text-fg shadow-sm'
-          : 'text-muted/80 hover:text-fg hover:bg-surface/50',
+          : 'text-muted hover:text-fg hover:bg-surface/50',
         disabled && 'opacity-50 pointer-events-none',
         className,
       )}

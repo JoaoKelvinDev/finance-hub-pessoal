@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowDownLeft, ArrowUpRight, HandCoins, Plus } from 'luc
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CurrencyDisplay } from '@/components/finance/currency'
+import { ExportButton } from '@/components/finance/export-button'
 import { EmptyState, ErrorState } from '@/components/finance/states'
 import { ListSkeleton } from '@/components/finance/transaction-list'
 import { Button } from '@/components/ui/button'
@@ -56,9 +57,12 @@ export function PartiesPage() {
             Empréstimos, adiantamentos e dívidas com seus contatos. Nada aqui conta como receita ou despesa.
           </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}>
-          <Plus /> Novo registro
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportButton kind="party-balances" />
+          <Button onClick={() => setNewOpen(true)}>
+            <Plus /> Novo registro
+          </Button>
+        </div>
       </div>
 
       <motion.div variants={staggerContainer} initial="initial" animate="enter" className="grid grid-cols-1 gap-3 sm:grid-cols-3">

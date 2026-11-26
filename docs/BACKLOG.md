@@ -10,7 +10,10 @@
 - [x] Frontend: login, layout com sidebar, transições, Dashboard, Contas, Lançamentos, Pessoas
 - [x] CI básica
 
-Pendências conhecidas: rate limit próprio na API (hoje só o do Supabase Auth), exportação CSV (Etapa 5), testes E2E automatizados no repositório (validado manualmente com Playwright).
+Pendências conhecidas: rate limit próprio na API (hoje só o do Supabase Auth).
+
+- [x] Testes E2E no repositório (`frontend/e2e`, Playwright + axe), banco isolado `finance_hub_e2e`, job `e2e` no CI
+      em todo PR — ver README › Testes
 
 ## Etapa 2 — Cartões e faturas
 Cadastro de cartão, `resolve_statement_for_purchase`, ciclos materializados, compras/parcelas, pagamento de fatura, utilização de limite.
@@ -55,6 +58,12 @@ Orçamentos, metas, projeção 30/60/90, relatórios, exportações, backup/rest
 - [x] Projeção diária 30/60/90 (`GET /projection`), cenários conservador e base; cartão só pela fatura
 - [x] Tela `/planejamento` (Orçamentos, Metas, Projeção) e cartão de metas no dashboard
 - [x] Ícones de marca locais (`simple-icons`, sem serviço externo) com selo do cartão nas compras
-- [ ] Relatórios: por categoria, período, cartão e pessoa; aging de recebíveis (0–30 / 31–60 / 61–90 / 90+)
-- [ ] Exportação CSV (UTF-8) e XLSX/PDF progressivas
-- [ ] Performance das consultas, observabilidade e backup/restore testado
+- [x] Relatórios: por categoria (caixa/competência, subcategorias, comparação), fluxo de caixa, cartão e pessoa;
+      aging de recebíveis (a vencer / 1–30 / 31–60 / 61–90 / 90+ / sem vencimento) — `/relatorios`
+- [x] Exportação CSV para Excel pt-BR (";", vírgula decimal, UTF-8 com BOM), auditada
+- [x] XLSX (openpyxl: números e datas reais, formato R$, cabeçalho congelado, autofiltro, total) e PDF
+      (reportlab: A4 paisagem, cabeçalho repetido, "Página X de Y") para os 7 tipos — `/exports/{tipo}.{csv|xlsx|pdf}`.
+      Os três formatos saem da mesma montagem de tabela (`reporting/exports.py`), então os totais são iguais.
+      Pacote completo XLSX (uma aba por tipo) em Configurações — `/exports/bundle.xlsx`. Formato vai na auditoria.
+- [x] Backup completo em JSON e restauração por CLI só em banco vazio (testada ida e volta)
+- [ ] Performance das consultas e observabilidade

@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
+import { SIGNED_OUT_EVENT, signOutEverywhere, supabase } from '@/lib/supabase'
 
 interface AuthState {
   session: Session | null
@@ -21,7 +21,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
     const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
-    return () => data.subscription.unsubscribe()
+    const onSignedOut = () => setSession(null)
+    window.addEventListener(SIGNED_OUT_EVENT, onSignedOut)
+    return () => {
+      data.subscription.unsubscribe()
+      window.removeEventListener(SIGNED_OUT_EVENT, onSignedOut)
+    }
   }, [])
 
   const value: AuthState = {
@@ -33,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return error.code === 'invalid_credentials' ? 'E-mail ou senha incorretos.' : 'Não foi possível entrar agora.'
     },
     async signOut() {
-      await supabase.auth.signOut()
+      await signOutEverywhere()
     },
   }
 
