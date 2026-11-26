@@ -37,7 +37,17 @@ npm run dev                # http://localhost:5173
 ```bash
 cd backend && uv run pytest        # usa um banco isolado `finance_hub_test` no Postgres local
 cd frontend && npm run build       # checagem de tipos + build
+cd frontend && npm run e2e         # fluxos reais no navegador (Playwright), banco isolado `finance_hub_e2e`
+cd frontend && npm run e2e:ui      # o mesmo, assistindo os testes rodarem
+cd frontend && npm run e2e:report  # relatório da última execução (capturas e trace das falhas)
 ```
+
+Os testes E2E sobem sozinhos uma API (porta 8010) e um frontend (porta 5180) próprios, com segredo JWT e
+proprietário de teste, e zeram o banco `finance_hub_e2e` antes de cada teste — seus dados nunca são tocados.
+Precisam do Postgres local (`supabase start`) e, localmente, usam o Microsoft Edge instalado. Cobrem: acesso,
+conta e lançamentos, transferência, cartão (compra parcelada → faturas → pagamento sem dupla contagem), contas
+da casa + calendário, terceiros, orçamento, relatórios com download (XLSX/PDF/CSV) e uso no celular, além de
+verificação de acessibilidade (axe, WCAG 2.1 AA) nas telas principais. Rodam no CI em todo PR.
 
 ## Segurança
 

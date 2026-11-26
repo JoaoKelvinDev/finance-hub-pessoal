@@ -10,7 +10,10 @@
 - [x] Frontend: login, layout com sidebar, transições, Dashboard, Contas, Lançamentos, Pessoas
 - [x] CI básica
 
-Pendências conhecidas: rate limit próprio na API (hoje só o do Supabase Auth), testes E2E automatizados no repositório (validado manualmente com Playwright).
+Pendências conhecidas: rate limit próprio na API (hoje só o do Supabase Auth).
+
+- [x] Testes E2E no repositório (`frontend/e2e`, Playwright + axe), banco isolado `finance_hub_e2e`, job `e2e` no CI
+      em todo PR — ver README › Testes
 
 ## Etapa 2 — Cartões e faturas
 Cadastro de cartão, `resolve_statement_for_purchase`, ciclos materializados, compras/parcelas, pagamento de fatura, utilização de limite.
