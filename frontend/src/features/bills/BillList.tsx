@@ -108,6 +108,7 @@ export function BillList({ includeArchived = false, onBillClick }: BillListProps
           isExpanded={expandedId === bill.id}
           onToggle={() => setExpandedId(expandedId === bill.id ? null : bill.id)}
           onClick={(e) => handleClick(bill, e)}
+          onOpen={() => onBillClick?.(bill)}
           onArchive={handleArchive}
           onRestore={handleRestore}
           isArchiving={archiveBill.variables === bill.id && archiveBill.isPending}
@@ -123,6 +124,8 @@ interface BillCardProps {
   isExpanded: boolean
   onToggle: () => void
   onClick: (e: React.MouseEvent) => void
+  /** Abre a conta. O clique no card ignora botões, então o botão "Ver detalhes" precisa chamar isto direto. */
+  onOpen: () => void
   onArchive: (id: string) => void
   onRestore: (id: string) => void
   isArchiving: boolean
@@ -134,6 +137,7 @@ function BillCard({
   isExpanded,
   onToggle,
   onClick,
+  onOpen,
   onArchive,
   onRestore,
   isArchiving,
@@ -255,7 +259,7 @@ function BillCard({
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={(e) => { e.stopPropagation(); onClick(e); }}
+                  onClick={(e) => { e.stopPropagation(); onOpen(); }}
                 >
                   Ver detalhes
                 </Button>

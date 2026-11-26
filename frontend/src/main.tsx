@@ -28,10 +28,20 @@ import './index.css'
 const PlanningPage = lazy(() => import('@/pages/planning').then((m) => ({ default: m.PlanningPage })))
 const ReportsPage = lazy(() => import('@/pages/reports').then((m) => ({ default: m.ReportsPage })))
 
+// Tudo que depende de saldo, fatura ou vencimento. Revalidado após QUALQUER mutação bem-sucedida,
+// inclusive as que usam useMutation direto (ex.: compra no cartão e pagamento de fatura) —
+// antes, essas telas só se atualizavam ao recarregar a página.
+const FINANCE_KEYS = [
+  'dashboard', 'accounts', 'ledger', 'transactions', 'cards', 'bills', 'calendar', 'parties',
+  'alerts', 'budgets', 'goals', 'projection', 'reports',
+]
+
 const queryClient: QueryClient = new QueryClient({
-  // Qualquer mutação bem-sucedida pode alterar vencimentos: o calendário é sempre revalidado.
   mutationCache: new MutationCache({
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['calendar'] }),
+    // Sem await: o diálogo fecha na hora e as telas se atualizam em seguida.
+    onSuccess: () => {
+      for (const k of FINANCE_KEYS) void queryClient.invalidateQueries({ queryKey: [k] })
+    },
   }),
   defaultOptions: {
     queries: {

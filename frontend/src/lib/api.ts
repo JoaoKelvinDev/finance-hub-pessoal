@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { signOutEverywhere, supabase } from '@/lib/supabase'
 import type { ApiErrorBody } from '@/types/api'
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ''}/api/v1`
@@ -52,7 +52,7 @@ export async function api<T>(
     /* corpo não-JSON */
   }
   if (res.status === 401 || res.status === 403) {
-    await supabase.auth.signOut()
+    await signOutEverywhere()
   }
   throw new ApiError(
     res.status,

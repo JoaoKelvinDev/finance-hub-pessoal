@@ -59,10 +59,24 @@ export function daysBetween(a: string, b: string) {
   return Math.round((Date.UTC(pb.y, pb.m - 1, pb.d) - Date.UTC(pa.y, pa.m - 1, pa.d)) / 86_400_000)
 }
 
-export function formatRelativeDate(iso: string): string {
-  const { y, m, d } = parts(iso)
-  const date = new Date(Date.UTC(y, m - 1, d))
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+/**
+ * dd/mm/aaaa. Data civil (AAAA-MM-DD) é formatada sem conversão de fuso; data-hora (com "T")
+ * é convertida para o fuso do app. Nunca use `new Date('AAAA-MM-DD')` para exibir: o JS lê como
+ * meia-noite UTC e, em Fortaleza (UTC−3), a data aparece um dia antes.
+ */
+export function formatRelativeDate(value: string): string {
+  if (value.length > 10) {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' }).format(
+      new Date(value),
+    )
+  }
+  return formatDate(value)
+}
+
+/** 'AAAA-MM-DD' → 'novembro de 2026', sem conversão de fuso. */
+export function formatMonthLong(iso: string): string {
+  const { y, m } = parts(iso)
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(new Date(Date.UTC(y, m - 1, 1)))
 }
 
 export function formatDateForInput(date: Date): string {

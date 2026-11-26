@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     app_timezone: str = "America/Fortaleza"
     log_level: str = "INFO"
+    # Em produção a documentação interativa (/docs, /openapi.json) fica desligada.
+    docs_enabled: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

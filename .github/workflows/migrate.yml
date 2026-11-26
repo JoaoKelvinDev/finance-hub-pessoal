@@ -1,0 +1,37 @@
+name: Migrações (produção)
+
+# Aplica as migrações do Alembic no banco do Supabase (nuvem) quando a main muda.
+# A Vercel publica o site/API sozinha pelo GitHub; as migrações são aditivas, então
+# a ordem entre os dois não quebra o app.
+on:
+  push:
+    branches: [main]
+    paths: ["backend/alembic/**", "backend/app/models/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: migrate-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --no-dev
+      - name: alembic upgrade head
+        env:
+          # Pooler do Supabase em modo sessão (porta 5432): funciona em IPv4 (o GitHub não tem IPv6).
+          ALEMBIC_DATABASE_URL: ${{ secrets.PROD_MIGRATIONS_DATABASE_URL }}
+        run: |
+          test -n "$ALEMBIC_DATABASE_URL" || { echo "Secret PROD_MIGRATIONS_DATABASE_URL ausente"; exit 1; }
+          uv run alembic upgrade head
+          uv run alembic current

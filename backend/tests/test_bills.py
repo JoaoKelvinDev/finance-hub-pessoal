@@ -4,11 +4,13 @@ from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 
+from app.domains.support import today_local
+
 # ---------- Helpers ----------
 
 def _account(client, name="Conta", opening=1000000, opening_date=None):
     if opening_date is None:
-        opening_date = date.today().isoformat()
+        opening_date = today_local().isoformat()
     r = client.post(
         "/api/v1/accounts",
         json={"name": name, "type": "CHECKING", "opening_balance_cents": opening, "opening_date": opening_date},
@@ -34,7 +36,7 @@ def _bill(client, account_id, name="Internet", category="INTERNET", amount=15000
 
 def _recurrence(client, bill_id, frequency="MONTHLY", day=10, start=None, auto_post=True):
     if start is None:
-        start = date.today().replace(day=1).isoformat()
+        start = today_local().replace(day=1).isoformat()
     r = client.post(
         "/api/v1/bills/recurrences",
         json={
@@ -177,7 +179,7 @@ def test_create_recurrence(client):
             "bill_id": b["id"],
             "frequency": "MONTHLY",
             "day_of_month": 15,
-            "start_date": date.today().isoformat(),
+            "start_date": today_local().isoformat(),
             "auto_post": True,
         },
     )
@@ -200,7 +202,7 @@ def test_create_recurrence_custom_requires_interval(client):
             "bill_id": b["id"],
             "frequency": "CUSTOM",
             "day_of_month": 1,
-            "start_date": date.today().isoformat(),
+            "start_date": today_local().isoformat(),
         },
     )
     assert r.status_code == 400
@@ -217,7 +219,7 @@ def test_create_recurrence_invalid_day(client):
             "bill_id": b["id"],
             "frequency": "MONTHLY",
             "day_of_month": 32,
-            "start_date": date.today().isoformat(),
+            "start_date": today_local().isoformat(),
         },
     )
     assert r.status_code == 422  # Pydantic validation error
@@ -280,7 +282,7 @@ def test_create_manual_installment(client):
     """Cria parcela manual."""
     acc = _account(client)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=10)
+    due = today_local() + timedelta(days=10)
     r = client.post(
         "/api/v1/bills/installments",
         json={
@@ -303,7 +305,7 @@ def test_list_installments(client):
     """Lista parcelas."""
     acc = _account(client)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=5)
+    due = today_local() + timedelta(days=5)
     inst = _installment(client, b["id"], due, 5000)
     print(f"DEBUG installment created: {inst}")
     r = client.get("/api/v1/bills/installments")
@@ -318,7 +320,7 @@ def test_upcoming_installments(client):
     """Parcelas próximas do vencimento."""
     acc = _account(client)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=3)
+    due = today_local() + timedelta(days=3)
     _installment(client, b["id"], due, 5000)
     r = client.get("/api/v1/bills/installments/upcoming?days=7")
     assert r.status_code == 200
@@ -331,7 +333,7 @@ def test_overdue_installments(client):
     """Parcelas vencidas."""
     acc = _account(client)
     b = _bill(client, acc["id"])
-    due = date.today() - timedelta(days=5)
+    due = today_local() - timedelta(days=5)
     _installment(client, b["id"], due, 5000)
     r = client.get("/api/v1/bills/installments/overdue")
     assert r.status_code == 200
@@ -344,14 +346,14 @@ def test_pay_installment(client):
     """Paga uma parcela."""
     acc = _account(client, opening=50000)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=1)
+    due = today_local() + timedelta(days=1)
     inst = _installment(client, b["id"], due, 10000)
 
     r = client.post(
         f"/api/v1/bills/installments/{inst['id']}/pay",
         params={
             "account_id": acc["id"],
-            "paid_on": date.today().isoformat(),
+            "paid_on": today_local().isoformat(),
         },
     )
     assert r.status_code == 200
@@ -365,7 +367,7 @@ def test_pay_installment_idempotency(client):
     """Idempotência no pagamento de parcela."""
     acc = _account(client, opening=50000)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=1)
+    due = today_local() + timedelta(days=1)
     inst = _installment(client, b["id"], due, 10000)
     idem_key = "pay-bill-123"
 
@@ -374,7 +376,7 @@ def test_pay_installment_idempotency(client):
         f"/api/v1/bills/installments/{inst['id']}/pay",
         params={
             "account_id": acc["id"],
-            "paid_on": date.today().isoformat(),
+            "paid_on": today_local().isoformat(),
             "idempotency_key": idem_key,
         },
     )
@@ -385,7 +387,7 @@ def test_pay_installment_idempotency(client):
         f"/api/v1/bills/installments/{inst['id']}/pay",
         params={
             "account_id": acc["id"],
-            "paid_on": date.today().isoformat(),
+            "paid_on": today_local().isoformat(),
             "idempotency_key": idem_key,
         },
     )
@@ -398,13 +400,13 @@ def test_reverse_installment_payment(client):
     """Estorna pagamento de parcela."""
     acc = _account(client, opening=50000)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=1)
+    due = today_local() + timedelta(days=1)
     inst = _installment(client, b["id"], due, 10000)
 
     # Paga
     client.post(
         f"/api/v1/bills/installments/{inst['id']}/pay",
-        params={"account_id": acc["id"], "paid_on": date.today().isoformat()},
+        params={"account_id": acc["id"], "paid_on": today_local().isoformat()},
     )
 
     # Estorna
@@ -422,7 +424,7 @@ def test_skip_installment(client):
     """Marca parcela como SKIPPED."""
     acc = _account(client)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=1)
+    due = today_local() + timedelta(days=1)
     inst = _installment(client, b["id"], due, 10000)
 
     r = client.post(
@@ -438,7 +440,7 @@ def test_cancel_installment(client):
     """Cancela parcela."""
     acc = _account(client)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=1)
+    due = today_local() + timedelta(days=1)
     inst = _installment(client, b["id"], due, 10000)
 
     r = client.post(
@@ -454,12 +456,12 @@ def test_cannot_cancel_paid_installment(client):
     """Não pode cancelar parcela paga."""
     acc = _account(client, opening=50000)
     b = _bill(client, acc["id"])
-    due = date.today() + timedelta(days=1)
+    due = today_local() + timedelta(days=1)
     inst = _installment(client, b["id"], due, 10000)
 
     client.post(
         f"/api/v1/bills/installments/{inst['id']}/pay",
-        params={"account_id": acc["id"], "paid_on": date.today().isoformat()},
+        params={"account_id": acc["id"], "paid_on": today_local().isoformat()},
     )
 
     r = client.post(f"/api/v1/bills/installments/{inst['id']}/cancel")
@@ -473,7 +475,7 @@ def test_post_installments_from_recurrence(client):
     acc = _account(client)
     b = _bill(client, acc["id"])
     rec = _recurrence(client, b["id"])
-    up_to = date.today() + timedelta(days=60)
+    up_to = today_local() + timedelta(days=60)
     r = client.post(
         f"/api/v1/bills/recurrences/{rec['id']}/post-installments",
         params={"up_to_date": up_to.isoformat()},
@@ -489,7 +491,7 @@ def test_post_installments_twice_with_long_history(client):
     """Recorrência com mais de 12 ocorrências: gera todas e uma 2ª geração não quebra nem duplica."""
     acc = _account(client, opening_date="2024-01-01")
     b = _bill(client, acc["id"])
-    today = date.today()
+    today = today_local()
     start = date(today.year - 2, today.month, 1)
     rec = _recurrence(client, b["id"], day=1, start=start.isoformat(), auto_post=False)
     url = f"/api/v1/bills/recurrences/{rec['id']}/post-installments"
@@ -513,7 +515,7 @@ def test_auto_post_global(client):
     _recurrence(client, b["id"])
     r = client.post(
         "/api/v1/bills/auto-post",
-        params={"up_to_date": (date.today() + timedelta(days=60)).isoformat()},
+        params={"up_to_date": (today_local() + timedelta(days=60)).isoformat()},
     )
     assert r.status_code == 200
     data = r.json()
@@ -622,7 +624,7 @@ def test_is_recurrence_active():
     """Verifica status ativo de recorrência."""
     from app.domains.bills.rules import is_recurrence_active
 
-    today = date.today()
+    today = today_local()
 
     # Ativa, dentro do período
     assert is_recurrence_active("ACTIVE", today, today - timedelta(days=10), today + timedelta(days=10))

@@ -20,6 +20,9 @@ def _add_months(d: date, months: int) -> date:
     return date(y, m, day)
 
 
+add_months = _add_months
+
+
 def resolve_cycle_start(card_closing_day: int, purchase_date: date, policy: Literal["INCLUSIVE", "EXCLUSIVE"]) -> date:
     """
     Determina o início do ciclo (data de abertura da fatura) para uma compra.
@@ -61,14 +64,17 @@ def resolve_cycle_dates(cycle_start: date) -> tuple[date, date]:
     return cycle_start, cycle_end
 
 
-def resolve_due_date(cycle_start: date, due_day: int, due_month_offset: Literal[0, 1]) -> date:
+def resolve_due_date(closing_date: date, due_day: int, due_month_offset: Literal[0, 1]) -> date:
     """
-    Calcula a data de vencimento da fatura.
+    Calcula a data de vencimento a partir da data de FECHAMENTO da fatura (= cycle_end_exclusive).
 
-    - due_month_offset = 0: vence no mesmo mês do ciclo (raro)
-    - due_month_offset = 1 (padrão): vence no mês seguinte ao início do ciclo
+    - due_month_offset = 0: vence no mesmo mês do fechamento (exige due_day > closing_day)
+    - due_month_offset = 1 (padrão): vence no mês seguinte ao fechamento
+      Ex.: fecha 10/12, vence dia 5 do mês seguinte → 05/01.
+
+    Antes era calculado a partir do INÍCIO do ciclo, o que fazia a fatura vencer antes de fechar.
     """
-    target = _add_months(cycle_start, due_month_offset)
+    target = _add_months(closing_date, due_month_offset)
     # Se o dia de vencimento não existe no mês alvo (ex.: 31 em fevereiro), usa último dia
     last = _last_day_of_month(target.year, target.month)
     day = min(due_day, last)
@@ -127,6 +133,16 @@ def validate_due_day(due_day: int) -> None:
 def validate_due_month_offset(offset: int) -> None:
     if offset not in (0, 1):
         raise DomainError("due_month_offset_invalid", "Offset de vencimento deve ser 0 ou 1.")
+
+
+def validate_due_after_closing(closing_day: int, due_day: int, offset: int) -> None:
+    """Vencimento no mesmo mês do fechamento só faz sentido se vier depois do fechamento."""
+    if offset == 0 and due_day <= closing_day:
+        raise DomainError(
+            "due_before_closing",
+            "Com vencimento no mesmo mês, o dia do vencimento deve ser depois do dia do fechamento. "
+            "Use 'mês seguinte'.",
+        )
 
 
 def validate_purchase_date_not_future(purchase_date: date, today: date) -> None:
