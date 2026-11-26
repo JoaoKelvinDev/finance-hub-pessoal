@@ -11,7 +11,7 @@ import { NewPurchaseDialog } from '@/features/cards/new-purchase-dialog'
 import { PayStatementDialog } from '@/features/cards/pay-statement-dialog'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { formatRelativeDate } from '@/lib/date'
+import { formatDate, formatMonthLong, formatRelativeDate } from '@/lib/date'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/misc'
 
@@ -219,7 +219,7 @@ function StatementCard({ statement, onClick, onViewDetail }: StatementCardProps)
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium text-fg">
-                  {new Date(statement.cycle_start_date).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                  {formatMonthLong(statement.cycle_start_date)}
                 </p>
                 <Badge variant="outline" className={cn('text-xs', cfg.color)}>
                   {cfg.label}
@@ -227,7 +227,7 @@ function StatementCard({ statement, onClick, onViewDetail }: StatementCardProps)
               </div>
               <p className="text-xs text-muted flex items-center gap-1 mt-0.5">
                 <Calendar className="size-3" aria-hidden />
-                Vence em {new Date(statement.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                Vence em {formatDate(statement.due_date)}
                 {isOverdue && <span className="text-negative">· VENCIDA</span>}
               </p>
             </div>

@@ -300,7 +300,7 @@ function MobileNav({ onNew }: { onNew: () => void }) {
           whileTap={{ scale: 0.92 }}
           onClick={onNew}
           aria-label="Novo lançamento"
-          className="-mt-6 grid size-14 place-items-center rounded-2xl bg-accent text-accent-fg shadow-pop"
+          className="-mt-6 grid size-14 place-items-center rounded-2xl bg-accent-solid text-accent-fg shadow-pop"
         >
           <Plus className="size-6" />
         </motion.button>

@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Calendar } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { toast } from 'sonner'
+import { api, ApiError } from '@/lib/api'
+import { formatBRL } from '@/lib/money'
 import { useAccounts, useCards } from '@/lib/queries'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/field'
 import { CurrencyInput, CurrencyDisplay } from '@/components/finance/currency'
 import type { CardStatement } from '@/types/api'
-import { formatDateForInput } from '@/lib/date'
-import { cn } from '@/lib/utils'
+import { formatDate, formatMonthLong, todayISO } from '@/lib/date'
+import { cn, newIdempotencyKey } from '@/lib/utils'
 
 interface PayStatementDialogProps {
   open: boolean
@@ -19,11 +21,11 @@ interface PayStatementDialogProps {
 }
 
 export function PayStatementDialog({ open, onOpenChange, statement, onSuccess }: PayStatementDialogProps) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     account_id: '',
     amount_cents: '',
-    paid_on: formatDateForInput(new Date()),
-  })
+    paid_on: todayISO(),
+  }))
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const accounts = useAccounts(false)
@@ -34,10 +36,18 @@ export function PayStatementDialog({ open, onOpenChange, statement, onSuccess }:
   const paid = statement?.paid_cents ?? 0
   const due = total - paid
 
+  // Obrigatória na API: sem ela o pagamento era sempre recusado (e o erro não aparecia).
+  // A mesma chave vale para repetições do mesmo envio (clique duplo); renova a cada abertura.
+  const idemKey = useRef(newIdempotencyKey())
+  useEffect(() => {
+    if (open) idemKey.current = newIdempotencyKey()
+  }, [open])
+
   const mutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       api(`/cards/statements/${statement!.id}/payments`, { method: 'POST', body }),
-    onSuccess: () => {
+    onSuccess: (_data, body) => {
+      toast.success(`Pagamento de ${formatBRL(body.amount_cents as number)} registrado.`)
       onOpenChange(false)
       onSuccess?.()
     },
@@ -45,6 +55,7 @@ export function PayStatementDialog({ open, onOpenChange, statement, onSuccess }:
       if (err.code === 'validation_error' && err.details) {
         setErrors(err.details as Record<string, string>)
       }
+      toast.error(err instanceof ApiError ? err.message : 'Não foi possível registrar o pagamento.')
     },
   })
 
@@ -57,6 +68,7 @@ export function PayStatementDialog({ open, onOpenChange, statement, onSuccess }:
       account_id: form.account_id,
       amount_cents: parseInt(form.amount_cents.replace(/\D/g, ''), 10),
       paid_on: form.paid_on,
+      idempotency_key: idemKey.current,
     }
 
     mutation.mutate(payload)
@@ -73,7 +85,7 @@ export function PayStatementDialog({ open, onOpenChange, statement, onSuccess }:
       open={open}
       onOpenChange={onOpenChange}
       title="Pagar fatura"
-      description={`Fatura de ${card?.name ?? 'cartão'} — ${new Date(statement.cycle_start_date).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`}
+      description={`Fatura de ${card?.name ?? 'cartão'} — ${formatMonthLong(statement.cycle_start_date)}`}
     >
       <div className="space-y-4">
         {/* Resumo da fatura */}
@@ -94,7 +106,7 @@ export function PayStatementDialog({ open, onOpenChange, statement, onSuccess }:
           </div>
           <p className="mt-3 text-xs text-muted flex items-center gap-1">
             <Calendar className="size-3" aria-hidden />
-            Vencimento: {new Date(statement.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            Vencimento: {formatDate(statement.due_date)}
             {statement.status === 'OVERDUE' && <span className="ml-2 text-negative flex items-center gap-1"><AlertTriangle className="size-3" /> Vencida</span>}
           </p>
         </div>

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { toast } from 'sonner'
+import { todayISO } from '@/lib/date'
+import { api, ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/field'
@@ -47,7 +49,7 @@ export function NewRecurrenceDialog({
   const [form, setForm] = useState({
     frequency: 'MONTHLY' as typeof FREQUENCIES[number],
     day_of_month: 10,
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: todayISO(), // toISOString() é UTC: depois das 21h em Fortaleza já seria amanhã
     end_date: '',
     custom_months_interval: '',
     auto_post: true,
@@ -71,6 +73,7 @@ export function NewRecurrenceDialog({
       if (err.code === 'validation_error' && err.details) {
         setErrors(err.details as Record<string, string>)
       }
+      toast.error(err instanceof ApiError ? err.message : 'Não foi possível salvar.')
     },
   })
 

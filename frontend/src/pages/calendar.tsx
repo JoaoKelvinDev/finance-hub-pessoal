@@ -399,7 +399,7 @@ function MonthGrid({
                 <span
                   className={cn(
                     'grid size-6 place-items-center rounded-full text-xs tabular-nums',
-                    isToday && 'bg-accent font-semibold text-accent-fg',
+                    isToday && 'bg-accent-solid font-semibold text-accent-fg',
                   )}
                 >
                   {parts(d).d}
@@ -520,7 +520,7 @@ function WeekView({
               <span
                 className={cn(
                   'grid size-7 place-items-center rounded-full text-sm tabular-nums',
-                  d === today && 'bg-accent font-semibold text-accent-fg',
+                  d === today && 'bg-accent-solid font-semibold text-accent-fg',
                 )}
               >
                 {parts(d).d}
